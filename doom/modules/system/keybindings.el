@@ -3,4 +3,7 @@
 (map! :leader
       (:prefix-map ("w" . "workbench")
        :desc "Show profile" "p" #'workbench/show-profile
-       :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool))
+       :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool)
+
+      (:prefix-map ("t" . "terminals")
+       :desc "Open terminal" "t" #'workbench/open-terminal))
