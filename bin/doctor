@@ -37,12 +37,10 @@ printf "\n"
 
 check_command git
 check_command emacs
-
-if command -v emacsclient >/dev/null 2>&1; then
-    printf "ok  emacsclient found\n"
-else
-    printf "warn emacsclient not found; bin/workbench will use emacs\n"
-fi
+check_command emacsclient
+check_command cmake
+check_command make
+check_command gcc
 
 if [ -n "$doom_bin" ]; then
     printf "ok  doom found: %s\n" "$doom_bin"
