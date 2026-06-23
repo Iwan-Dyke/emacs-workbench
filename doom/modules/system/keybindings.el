@@ -22,4 +22,9 @@
        :desc "Open files" "f" #'workbench/open-files)
 
       (:prefix-map ("g" . "git")
-       :desc "Open Git status" "g" #'workbench/open-git))
+       :desc "Open Git status" "g" #'workbench/open-git)
+
+      (:prefix-map ("p" . "projects")
+       :desc "Switch project" "p" #'workbench/switch-project
+       :desc "Find project file" "f" #'workbench/find-project-file
+       :desc "Search project" "s" #'workbench/search-project))
