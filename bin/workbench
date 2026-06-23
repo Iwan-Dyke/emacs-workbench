@@ -2,6 +2,7 @@
 set -u
 
 profile="${1:-personal}"
+server_name="workbench-$profile"
 
 case "$profile" in
 personal | work)
@@ -15,8 +16,9 @@ esac
 
 export WORKBENCH_PROFILE="$profile"
 
-if command -v emacsclient >/dev/null 2>&1 && emacsclient -e t >/dev/null 2>&1; then
-    emacsclient -c
-else
+if ! command -v emacsclient >/dev/null 2>&1; then
     emacs
+    exit "$?"
 fi
+
+emacsclient --socket-name "$server_name" --alternate-editor "" -c
