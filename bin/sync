@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -u
+
+if ! command -v doom >/dev/null 2>&1; then
+    printf "fail doom command not found\n"
+    printf "Run ./bin/install first, or add Doom's bin directory to PATH.\n"
+    exit 1
+fi
+
+doom sync
