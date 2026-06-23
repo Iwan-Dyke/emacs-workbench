@@ -24,15 +24,14 @@ work:
     ./bin/workbench work
 
 stop profile="personal":
-    -emacsclient --socket-name workbench-{{profile}} --eval '(kill-emacs)'
+    ./bin/workbench stop {{profile}}
 
 restart profile="personal":
-    -emacsclient --socket-name workbench-{{profile}} --eval '(kill-emacs)'
-    ./bin/workbench {{profile}}
+    ./bin/workbench restart {{profile}}
 
 restart-all:
-    -emacsclient --socket-name workbench-personal --eval '(kill-emacs)'
-    -emacsclient --socket-name workbench-work --eval '(kill-emacs)'
+    ./bin/workbench stop personal
+    ./bin/workbench stop work
 
 status:
     git status --short

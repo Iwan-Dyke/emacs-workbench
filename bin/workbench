@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -u
+command_name="start"
+
+if [ "${1:-}" = "stop" ] || [ "${1:-}" = "restart" ]; then
+    command_name="$1"
+    shift
+fi
 
 profile="${1:-personal}"
 server_name="workbench-$profile"
@@ -9,7 +15,7 @@ personal | work)
     ;;
 *)
     printf "fail unknown profile: %s\n" "$profile"
-    printf "usage: %s [personal|work]\n" "$0"
+    printf "usage: %s [personal|work] | stop [personal|work] | restart [personal|work]\n" "$0"
     exit 1
     ;;
 esac
@@ -17,8 +23,28 @@ esac
 export WORKBENCH_PROFILE="$profile"
 
 if ! command -v emacsclient >/dev/null 2>&1; then
+    if [ "$command_name" != "start" ]; then
+        printf "fail emacsclient not found\n"
+        exit 1
+    fi
+
     emacs
     exit "$?"
 fi
 
-emacsclient --socket-name "$server_name" --alternate-editor "" -c
+stop_daemon() {
+    emacsclient --socket-name "$server_name" --eval '(kill-emacs)' >/dev/null 2>&1
+}
+
+case "$command_name" in
+start)
+    emacsclient --socket-name "$server_name" --alternate-editor "" -c
+    ;;
+stop)
+    stop_daemon || true
+    ;;
+restart)
+    stop_daemon || true
+    emacsclient --socket-name "$server_name" --alternate-editor "" -c
+    ;;
+esac
