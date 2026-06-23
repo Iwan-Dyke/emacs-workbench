@@ -16,4 +16,7 @@
 
       (:prefix-map ("q" . "quit/session")
        :desc "Close frame" "f" #'workbench/close-frame
-       :desc "Stop daemon" "q" #'workbench/stop-daemon))
+       :desc "Stop daemon" "q" #'workbench/stop-daemon)
+
+      (:prefix-map ("f" . "files")
+       :desc "Open files" "f" #'workbench/open-files))
