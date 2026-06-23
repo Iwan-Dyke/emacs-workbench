@@ -1,1 +1,3 @@
 *.elc
+doom/profiles/local.el
+doom/profiles/secrets.el
