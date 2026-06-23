@@ -28,3 +28,13 @@
   "Show the default AI tool for the active workbench profile."
   (interactive)
   (message "Workbench default AI tool: %s" workbench/default-ai-tool))
+
+(defun workbench/close-frame ()
+  "Close the selected Emacs frame."
+  (interactive)
+  (delete-frame))
+
+(defun workbench/stop-daemon ()
+  "Stop the current Emacs workbench daemon."
+  (interactive)
+  (save-buffers-kill-emacs))

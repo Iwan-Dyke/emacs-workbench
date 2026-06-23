@@ -12,4 +12,8 @@
        :desc "Open default AI" "a" #'workbench/open-default-ai
        :desc "Open Codex" "c" #'workbench/open-codex
        :desc "Open Kiro" "k" #'workbench/open-kiro
-       :desc "Open Claude" "l" #'workbench/open-claude))
+       :desc "Open Claude" "l" #'workbench/open-claude)
+
+      (:prefix-map ("q" . "quit/session")
+       :desc "Close frame" "f" #'workbench/close-frame
+       :desc "Stop daemon" "q" #'workbench/stop-daemon))
