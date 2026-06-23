@@ -21,6 +21,16 @@ check_command() {
     fi
 }
 
+check_optional_command() {
+    local name="$1"
+
+    if command -v "$name" >/dev/null 2>&1; then
+        printf "ok  %s found\n" "$name"
+    else
+        printf "warn %s not found\n" "$name"
+    fi
+}
+
 check_path() {
     local path="$1"
 
@@ -41,6 +51,10 @@ check_command emacsclient
 check_command cmake
 check_command make
 check_command gcc
+
+check_optional_command codex
+check_optional_command kiro
+check_optional_command claude
 
 if [ -n "$doom_bin" ]; then
     printf "ok  doom found: %s\n" "$doom_bin"
