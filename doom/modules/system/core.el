@@ -23,3 +23,8 @@
   "Show the active Emacs Workbench profile."
   (interactive)
   (message "Workbench profile: %s" workbench/profile))
+
+(defun workbench/show-default-ai-tool ()
+  "Show the default AI tool for the active workbench profile."
+  (interactive)
+  (message "Workbench default AI tool: %s" workbench/default-ai-tool))
