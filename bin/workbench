@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -u
+
+profile="${1:-personal}"
+
+case "$profile" in
+personal | work)
+    ;;
+*)
+    printf "fail unknown profile: %s\n" "$profile"
+    printf "usage: %s [personal|work]\n" "$0"
+    exit 1
+    ;;
+esac
+
+export WORKBENCH_PROFILE="$profile"
+
+if command -v emacsclient >/dev/null 2>&1 && emacsclient -e t >/dev/null 2>&1; then
+    emacsclient -c
+else
+    emacs
+fi

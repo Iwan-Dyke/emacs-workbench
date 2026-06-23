@@ -38,6 +38,12 @@ printf "\n"
 check_command git
 check_command emacs
 
+if command -v emacsclient >/dev/null 2>&1; then
+    printf "ok  emacsclient found\n"
+else
+    printf "warn emacsclient not found; bin/workbench will use emacs\n"
+fi
+
 if [ -n "$doom_bin" ]; then
     printf "ok  doom found: %s\n" "$doom_bin"
 else
@@ -49,6 +55,10 @@ check_path ./doom
 check_path ./doom/init.el
 check_path ./doom/config.el
 check_path ./doom/packages.el
+check_path ./bin/install
+check_path ./bin/sync
+check_path ./bin/doctor
+check_path ./bin/workbench
 
 if [ -L "$HOME/.config/doom" ]; then
     printf "ok  ~/.config/doom is a symlink\n"
