@@ -1,11 +1,13 @@
 ;;; workflows/ai.el -*- lexical-binding: t; -*-
 
 (defun workbench--open-vterm-command (buffer-name command)
-  "Open BUFFER-NAME in vterm and run COMMAND."
-  (let ((buffer (vterm buffer-name)))
-    (with-current-buffer buffer
-      (vterm-send-string command)
-      (vterm-send-return))))
+  "Open BUFFER-NAME in vterm and run COMMAND when creating it."
+  (if (get-buffer buffer-name)
+      (pop-to-buffer buffer-name)
+    (let ((buffer (vterm buffer-name)))
+      (with-current-buffer buffer
+        (vterm-send-string command)
+        (vterm-send-return)))))
 
 (defun workbench/open-codex ()
   "Open Codex in a workbench terminal."
@@ -30,4 +32,3 @@
     ("kiro" (workbench/open-kiro))
     ("claude" (workbench/open-claude))
     (_ (user-error "Unknown default AI tool: %s" workbench/default-ai-tool))))
-
