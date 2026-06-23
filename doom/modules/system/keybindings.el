@@ -19,4 +19,7 @@
        :desc "Stop daemon" "q" #'workbench/stop-daemon)
 
       (:prefix-map ("f" . "files")
-       :desc "Open files" "f" #'workbench/open-files))
+       :desc "Open files" "f" #'workbench/open-files)
+
+      (:prefix-map ("g" . "git")
+       :desc "Open Git status" "g" #'workbench/open-git))
