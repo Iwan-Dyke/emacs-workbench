@@ -6,4 +6,10 @@
        :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool)
 
       (:prefix-map ("t" . "terminals")
-       :desc "Open terminal" "t" #'workbench/open-terminal))
+       :desc "Open terminal" "t" #'workbench/open-terminal)
+
+      (:prefix-map ("a" . "AI")
+       :desc "Open default AI" "a" #'workbench/open-default-ai
+       :desc "Open Codex" "c" #'workbench/open-codex
+       :desc "Open Kiro" "k" #'workbench/open-kiro
+       :desc "Open Claude" "l" #'workbench/open-claude))
