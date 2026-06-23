@@ -15,6 +15,12 @@ Markdown ADRs so other people can read and use them without Emacs.
 The private knowledge graph should be designed with future RDF/SPARQL export in
 mind, but RDF export does not need to exist in the first pass.
 
+Emacs can support knowledge editing, querying, tabular views, links, PDF
+resources, Graphviz/Mermaid previews, and simple visual outputs directly.
+However, rich interactive graph exploration such as zoomable node-link views,
+force-directed layouts, and canvas-style navigation may fit a browser-based
+viewer better than native Emacs buffers.
+
 ## Decision
 
 Use Org and org-roam for the private top-layer knowledge graph.
@@ -68,6 +74,23 @@ Resource
 `Feature`, `Story`, `Task`, and `Bug` are first-class types and are also treated
 conceptually as work items.
 
+Keep Emacs as the source-of-truth workbench for authoring, linking, querying,
+and exporting graph data. Treat a browser or web view as an optional
+visualization surface, not as the primary knowledge system.
+
+If rich graph visualization is needed later, prefer this split:
+
+```text
+Emacs / Org / org-roam -> source of truth and editing
+RDF or JSON export     -> generated graph data
+SPARQL / triplestore   -> optional query layer
+Browser graph view     -> optional rich visualization
+```
+
+Emacs may open that visualization in an external browser first. Embedded browser
+support such as `xwidget-webkit` can be evaluated later if it works reliably on
+the target machines.
+
 ## Consequences
 
 The workbench supports a graph-oriented knowledge workflow from the first pass.
@@ -82,3 +105,7 @@ the desired knowledge graph direction.
 
 RDF/SPARQL export remains future work. The first pass focuses on stable IDs,
 consistent properties, and useful links so export is possible later.
+
+Rich graph visualization is also future work. The first pass should avoid
+building a custom visual graph UI before the knowledge model and export shape
+are useful.
