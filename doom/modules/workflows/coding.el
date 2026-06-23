@@ -14,3 +14,26 @@
       (user-error "Doom workspaces are not available"))
     (setq default-directory project-directory)
     (workbench/open-files)))
+
+(defun workbench/open-startup-workspaces ()
+  "Open the minimal startup workspaces."
+  (interactive)
+  (unless (and (fboundp '+workspace-switch)
+               (fboundp '+workspace-current-name))
+    (user-error "Doom workspaces are not available"))
+  (let ((starting-workspace (+workspace-current-name)))
+    (+workspace-switch "files" t)
+    (workbench/open-files)
+    (+workspace-switch starting-workspace t)))
+
+(defvar workbench--startup-workspaces-opened nil
+  "Whether startup workspaces have been opened for this Emacs process.")
+
+(defun workbench--open-startup-workspaces-once (&rest _)
+  "Open startup workspaces once after the first usable frame exists."
+  (unless workbench--startup-workspaces-opened
+    (setq workbench--startup-workspaces-opened t)
+    (run-at-time 0.2 nil #'workbench/open-startup-workspaces)))
+
+(add-hook 'emacs-startup-hook #'workbench--open-startup-workspaces-once)
+(add-hook 'server-after-make-frame-hook #'workbench--open-startup-workspaces-once)
