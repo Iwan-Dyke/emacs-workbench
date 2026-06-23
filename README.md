@@ -26,10 +26,22 @@ Working so far:
 - focused sync wrapper
 - profile-specific personal/work daemons
 - Doom workspaces
+- project/file navigation entrypoints
+- Magit project status entrypoint
+- Dirvish/Dired file-manager entrypoint
 - general vterm entrypoint
 - profile-aware AI terminal commands
 - basic Space leader key surface
 - frame close and daemon shutdown commands
+
+The first-pass coding workflow is dashboard-first:
+
+```text
+Doom dashboard -> workspace -> Dirvish/Dired -> project coding workspace
+```
+
+For now, opening the project coding workspace remains future work. Use the
+file, project, Git, terminal, and AI entrypoints directly.
 
 ## Commands
 
@@ -82,6 +94,11 @@ just stop work
 Custom workbench keybindings use Doom's Space leader.
 
 ```text
+SPC f f   open files
+SPC g g   open Git status
+SPC p p   switch project
+SPC p f   find project file
+SPC p s   search project
 SPC w p   show active profile
 SPC w a   show default AI tool
 SPC t t   open workbench terminal
