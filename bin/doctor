@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -u
+
+status=0
+
+check_command() {
+    local name="$1"
+
+    if command -v "$name" >/dev/null 2>&1; then
+        printf "ok  %s found\n" "$name"
+    else
+        printf "fail %s not found\n" "$name"
+        status=1
+    fi
+}
+
+check_path() {
+    local path="$1"
+
+    if [ -e "$path" ]; then
+        printf "ok  %s exists\n" "$path"
+    else
+        printf "fail %s missing\n" "$path"
+        status=1
+    fi
+}
+
+printf "Emacs Workbench doctor\n"
+printf "\n"
+
+check_command git
+check_command emacs
+check_command doom
+
+check_path ./doom
+check_path ./doom/init.el
+check_path ./doom/config.el
+check_path ./doom/packages.el
+
+if [ -L "$HOME/.config/doom" ]; then
+    printf "ok  ~/.config/doom is a symlink\n"
+elif [ -e "$HOME/.config/doom" ]; then
+    printf "warn ~/.config/doom exists but is not a symlink\n"
+else
+    printf "warn ~/.config/doom is not linked yet\n"
+fi
+
+printf "\n"
+
+if [ "$status" -eq 0 ]; then
+    printf "Doctor passed\n"
+else
+    printf "Doctor found problems\n"
+fi
+
+exit "$status"
