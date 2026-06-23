@@ -6,5 +6,6 @@
 (load! "modules/tools/git")
 (load! "modules/tools/projects")
 (load! "modules/tools/terminals")
+(load! "modules/workflows/coding")
 (load! "modules/workflows/ai")
 (load! "modules/system/keybindings")

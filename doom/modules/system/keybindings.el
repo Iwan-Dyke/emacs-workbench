@@ -27,4 +27,5 @@
       (:prefix-map ("p" . "projects")
        :desc "Switch project" "p" #'workbench/switch-project
        :desc "Find project file" "f" #'workbench/find-project-file
-       :desc "Search project" "s" #'workbench/search-project))
+       :desc "Search project" "s" #'workbench/search-project
+       :desc "Open project workspace" "o" #'workbench/open-project-workspace))
