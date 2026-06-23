@@ -3,6 +3,13 @@ set -u
 
 status=0
 
+doom_bin=""
+if command -v doom >/dev/null 2>&1; then
+    doom_bin="$(command -v doom)"
+elif [ -x "$HOME/.emacs.d/bin/doom" ]; then
+    doom_bin="$HOME/.emacs.d/bin/doom"
+fi
+
 check_command() {
     local name="$1"
 
@@ -30,7 +37,13 @@ printf "\n"
 
 check_command git
 check_command emacs
-check_command doom
+
+if [ -n "$doom_bin" ]; then
+    printf "ok  doom found: %s\n" "$doom_bin"
+else
+    printf "fail doom command not found\n"
+    status=1
+fi
 
 check_path ./doom
 check_path ./doom/init.el

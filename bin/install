@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -u
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+doom_source="$repo_root/doom"
+doom_target="$HOME/.config/doom"
+
+status=0
+
+doom_bin=""
+if command -v doom >/dev/null 2>&1; then
+    doom_bin="$(command -v doom)"
+elif [ -x "$HOME/.emacs.d/bin/doom" ]; then
+    doom_bin="$HOME/.emacs.d/bin/doom"
+fi
+
+fail() {
+    printf "fail %s\n" "$1"
+    status=1
+}
+
+ok() {
+    printf "ok  %s\n" "$1"
+}
+
+if command -v emacs >/dev/null 2>&1; then
+    ok "emacs found"
+else
+    fail "emacs not found"
+fi
+
+if [ -n "$doom_bin" ]; then
+    ok "doom found: $doom_bin"
+else
+    fail "doom command not found"
+fi
+
+if [ ! -d "$doom_source" ]; then
+    fail "repo doom directory missing: $doom_source"
+fi
+
+if [ -L "$doom_target" ]; then
+    current_target="$(readlink "$doom_target")"
+
+    if [ "$current_target" = "$doom_source" ]; then
+        ok "$doom_target already links to repo doom config"
+    else
+        fail "$doom_target links to somewhere else: $current_target"
+    fi
+elif [ -e "$doom_target" ]; then
+    fail "$doom_target exists and is not a symlink"
+else
+    mkdir -p "$(dirname "$doom_target")"
+    ln -s "$doom_source" "$doom_target"
+    ok "linked $doom_target -> $doom_source"
+fi
+
+printf "\n"
+
+if [ "$status" -eq 0 ]; then
+    printf "Install skeleton passed\n"
+    printf "Next: ./bin/sync\n"
+else
+    printf "Install skeleton found problems\n"
+fi
+
+exit "$status"

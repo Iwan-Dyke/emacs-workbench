@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -u
 
-if ! command -v doom >/dev/null 2>&1; then
+doom_bin=""
+if command -v doom >/dev/null 2>&1; then
+    doom_bin="$(command -v doom)"
+elif [ -x "$HOME/.emacs.d/bin/doom" ]; then
+    doom_bin="$HOME/.emacs.d/bin/doom"
+fi
+
+if [ -z "$doom_bin" ]; then
     printf "fail doom command not found\n"
     printf "Run ./bin/install first, or add Doom's bin directory to PATH.\n"
     exit 1
 fi
 
-doom sync
+"$doom_bin" sync
