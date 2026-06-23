@@ -7,7 +7,7 @@
 
        :ui
        doom
-       doom-dashboard
+       dashboard
        modeline
 
        :editor
@@ -23,5 +23,4 @@
        magit
 
        :config
-       literate
        (default +bindings +smartparens))
