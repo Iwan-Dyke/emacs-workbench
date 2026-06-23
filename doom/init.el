@@ -9,6 +9,7 @@
        doom
        dashboard
        modeline
+       workspaces
 
        :editor
        evil

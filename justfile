@@ -23,5 +23,16 @@ personal:
 work:
     ./bin/workbench work
 
+stop profile="personal":
+    -emacsclient --socket-name workbench-{{profile}} --eval '(kill-emacs)'
+
+restart profile="personal":
+    -emacsclient --socket-name workbench-{{profile}} --eval '(kill-emacs)'
+    ./bin/workbench {{profile}}
+
+restart-all:
+    -emacsclient --socket-name workbench-personal --eval '(kill-emacs)'
+    -emacsclient --socket-name workbench-work --eval '(kill-emacs)'
+
 status:
     git status --short
