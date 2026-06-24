@@ -28,9 +28,13 @@ Working so far:
 - Doom workspaces
 - startup workspaces (files browser + default AI agent)
 - project/file navigation entrypoints
+- project coding workspace from a selected directory
+- Treemacs project tree on demand
 - Magit project status entrypoint
 - Dirvish/Dired file-manager entrypoint
+- full-frame Dirvish files workspace with directory/cursor memory
 - tmux-like terminal workspaces
+- tmux-style window navigation
 - profile-aware AI: full-window agent workspace and toggled project panes
 - basic Space leader key surface
 - frame close and daemon shutdown commands
@@ -38,11 +42,17 @@ Working so far:
 The first-pass coding workflow is dashboard-first:
 
 ```text
-Doom dashboard -> workspace -> Dirvish/Dired -> project coding workspace
+Doom dashboard -> files workspace (Dirvish) -> project coding workspace
 ```
 
-For now, opening the project coding workspace remains future work. Use the
-file, project, Git, terminal, and AI entrypoints directly.
+Open a project coding workspace with `SPC p o`: from the directory selected in
+Dirvish, or by prompt. It creates a workspace named after the directory and
+lands on a project placeholder. Pull in the Treemacs tree (`SPC e`) and an AI
+pane (`SPC t c/k/x`) on demand. A single command that builds the full
+`Treemacs | Code | AI` layout at once is still future work (ADR 0044).
+
+The files workspace opens full-frame Dirvish (listing plus preview) and returns
+to the directory and file you last browsed when you switch back to it.
 
 ## Commands
 
@@ -111,8 +121,18 @@ SPC t c   toggle Claude project pane
 SPC t k   toggle Kiro project pane
 SPC t x   toggle Codex project pane
 SPC a a   open profile default AI workspace
+SPC a p   toggle profile default AI project pane
 SPC q f   close frame
 SPC q q   stop daemon
+```
+
+Window navigation mirrors the Neovim motions and works inside vterm too:
+
+```text
+C-h   window left (into the Treemacs tree when there is none on the left)
+C-j   window down
+C-k   window up
+C-l   window right (out of the Treemacs tree back to the editor)
 ```
 
 Doom workspace controls use Doom's defaults:
