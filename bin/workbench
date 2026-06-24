@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 set -u
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Optional machine-local environment (e.g. HiDPI display scaling). Untracked;
+# see bin/workbench.local.example. Sourced before Emacs starts so GTK reads it.
+if [ -f "$repo_root/bin/workbench.local" ]; then
+    . "$repo_root/bin/workbench.local"
+fi
+
 command_name="start"
 
 if [ "${1:-}" = "stop" ] || [ "${1:-}" = "restart" ]; then

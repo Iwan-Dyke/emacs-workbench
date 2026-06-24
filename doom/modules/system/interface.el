@@ -1,5 +1,17 @@
 ;;; system/interface.el -*- lexical-binding: t; -*-
 
+;; Open frames maximized so the workbench fills the screen. The
+;; default-frame-alist entry covers a plain `emacs'; the hook covers
+;; emacsclient frames created against the workbench daemon, which do not
+;; reliably honor default-frame-alist.
+(add-to-list 'default-frame-alist '(fullscreen . maximized))
+
+(defun workbench--maximize-frame (&optional frame)
+  "Maximize FRAME, or the selected frame."
+  (set-frame-parameter (or frame (selected-frame)) 'fullscreen 'maximized))
+
+(add-hook 'server-after-make-frame-hook #'workbench--maximize-frame)
+
 (defun workbench--treemacs-window ()
   "Return the visible Treemacs window in this frame, or nil."
   (and (fboundp 'treemacs-get-local-window)

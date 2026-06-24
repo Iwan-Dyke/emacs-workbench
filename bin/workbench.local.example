@@ -1,0 +1,11 @@
+# Machine-local environment for the workbench launcher.
+# Copy to bin/workbench.local (untracked) and set machine-specific values.
+# Sourced by bin/workbench before Emacs starts, so GTK/display vars apply.
+#
+# Example: make pgtk Emacs fill a 4K screen that Windows scales at 150%.
+# GDK_SCALE must be a whole number (pgtk only does integer scaling), and
+# GDK_DPI_SCALE trims the font size back down: 2 * 0.75 = 1.5, so text stays
+# at ~150% size while the window fills the screen.
+#
+# export GDK_SCALE=2
+# export GDK_DPI_SCALE=0.75
