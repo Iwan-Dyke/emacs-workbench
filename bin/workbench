@@ -41,8 +41,24 @@ if ! command -v emacsclient >/dev/null 2>&1; then
     exit "$?"
 fi
 
+daemon_running() {
+    emacsclient --socket-name "$server_name" --eval 't' >/dev/null 2>&1
+}
+
 stop_daemon() {
+    daemon_running || return 0
     emacsclient --socket-name "$server_name" --eval '(kill-emacs)' >/dev/null 2>&1
+    # Wait for the daemon to actually exit before returning, so a following
+    # start does not reconnect to the dying process and inherit its old config.
+    local waited=0
+    while daemon_running; do
+        if [ "$waited" -ge 50 ]; then
+            printf "warn %s did not stop within 5s\n" "$server_name" >&2
+            return 1
+        fi
+        sleep 0.1
+        waited=$((waited + 1))
+    done
 }
 
 case "$command_name" in
