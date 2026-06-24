@@ -26,6 +26,9 @@
        :desc "Find file in project" "f" #'project-find-file
        :desc "Open file manager (Dirvish)" "m" #'workbench/open-files)
 
+      (:prefix ("c" . "code")
+       :desc "Format buffer/region" "f" #'+format/region-or-buffer)
+
       (:prefix-map ("g" . "git")
        :desc "Open Git status" "g" #'workbench/open-git)
 

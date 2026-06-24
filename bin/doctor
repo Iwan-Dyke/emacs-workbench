@@ -56,6 +56,24 @@ check_optional_command codex
 check_optional_command kiro
 check_optional_command claude
 
+# Language servers (ADR 0017, ADR 0029)
+check_optional_command pyright
+check_optional_command gopls
+check_optional_command terraform-ls
+check_optional_command bash-language-server
+check_optional_command yaml-language-server
+check_optional_command docker-langserver
+check_optional_command lua-language-server
+check_optional_command sqls
+
+# Formatters (ADR 0018)
+check_optional_command ruff
+check_optional_command gofmt
+check_optional_command stylua
+check_optional_command shfmt
+check_optional_command yamlfmt
+check_optional_command terraform
+
 if [ -n "$doom_bin" ]; then
     printf "ok  doom found: %s\n" "$doom_bin"
 else
