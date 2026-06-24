@@ -1,7 +1,7 @@
 # 0014. Use Command-Driven Coding Layout
 
 Date: 2026-06-22
-Status: Accepted
+Status: Accepted (left pane superseded by ADR 0043; layout-builder command deferred per ADR 0044)
 
 ## Context
 
