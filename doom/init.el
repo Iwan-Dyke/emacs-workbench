@@ -9,13 +9,14 @@
        doom
        dashboard
        modeline
+       treemacs
        workspaces
 
        :editor
        evil
 
        :emacs
-       dired
+       (dired +dirvish)
 
        :term
        vterm

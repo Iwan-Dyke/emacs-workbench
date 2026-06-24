@@ -1,6 +1,8 @@
 ;;; system/keybindings.el -*- lexical-binding: t; -*-
 
 (map! :leader
+      :desc "Toggle project tree" "e" #'workbench/open-project-tree
+
       (:prefix-map ("w" . "workbench")
        :desc "Show profile" "p" #'workbench/show-profile
        :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool
@@ -13,14 +15,16 @@
        :desc "Open default AI" "a" #'workbench/open-default-ai
        :desc "Open Codex" "c" #'workbench/open-codex
        :desc "Open Kiro" "k" #'workbench/open-kiro
-       :desc "Open Claude" "l" #'workbench/open-claude)
+       :desc "Open Claude" "l" #'workbench/open-claude
+       :desc "Open project AI pane" "p" #'workbench/open-project-ai)
 
       (:prefix-map ("q" . "quit/session")
        :desc "Close frame" "f" #'workbench/close-frame
        :desc "Stop daemon" "q" #'workbench/stop-daemon)
 
       (:prefix-map ("f" . "files")
-       :desc "Open files" "f" #'workbench/open-files)
+       :desc "Find file in project" "f" #'project-find-file
+       :desc "Open file manager (Dirvish)" "m" #'workbench/open-files)
 
       (:prefix-map ("g" . "git")
        :desc "Open Git status" "g" #'workbench/open-git)
@@ -29,4 +33,11 @@
        :desc "Switch project" "p" #'workbench/switch-project
        :desc "Find project file" "f" #'workbench/find-project-file
        :desc "Search project" "s" #'workbench/search-project
-       :desc "Open project workspace" "o" #'workbench/open-project-workspace))
+       :desc "Open project workspace" "o" #'workbench/open-project-workspace-dwim))
+
+;; tmux-like window navigation matching the Neovim C-h/j/k/l motions.
+;; This takes C-h from the help prefix; help remains available on SPC h.
+(map! "C-h" #'workbench/window-left
+      "C-j" #'evil-window-down
+      "C-k" #'evil-window-up
+      "C-l" #'workbench/window-right)
