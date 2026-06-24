@@ -15,7 +15,8 @@
        :desc "Toggle Codex pane" "x" #'workbench/toggle-project-codex)
 
       (:prefix-map ("a" . "AI")
-       :desc "Open default AI workspace" "a" #'workbench/open-default-ai-workspace)
+       :desc "Open default AI workspace" "a" #'workbench/open-default-ai-workspace
+       :desc "Toggle default AI project pane" "p" #'workbench/toggle-project-ai)
 
       (:prefix-map ("q" . "quit/session")
        :desc "Close frame" "f" #'workbench/close-frame

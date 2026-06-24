@@ -39,8 +39,8 @@
   '("*project-codex*" "*project-kiro*" "*project-claude*")
   "All project AI pane buffer names.")
 
-(defvar workbench-project-ai-width 0.4
-  "Width of the project AI pane.
+(defvar workbench-project-ai-width 25
+  "Width of the project AI pane, matching the file tree (ADR 0048).
 An integer is a column count; a float is a fraction of the frame width.")
 
 (defun workbench--project-ai-window ()
@@ -91,3 +91,10 @@ Hides any other project AI pane first so only one is visible (exclusive)."
   "Toggle Claude as the project AI pane."
   (interactive)
   (workbench--toggle-project-ai "*project-claude*" (workbench--ai-command "claude")))
+
+(defun workbench/toggle-project-ai ()
+  "Toggle the profile default AI as the project pane (ADR 0034, ADR 0048)."
+  (interactive)
+  (workbench--toggle-project-ai
+   (format "*project-%s*" workbench/default-ai-tool)
+   (workbench--ai-command workbench/default-ai-tool)))
