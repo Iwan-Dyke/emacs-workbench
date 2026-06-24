@@ -36,30 +36,3 @@ Creates the workspace and lands on the project placeholder. The tree
   (if (derived-mode-p 'dired-mode)
       (workbench/open-selected-path-as-project-workspace)
     (call-interactively #'workbench/open-project-workspace)))
-
-(defun workbench/open-startup-workspaces ()
-  "Open the minimal startup workspaces."
-  (interactive)
-  (unless (and (fboundp '+workspace-switch)
-               (fboundp '+workspace-current-name))
-    (user-error "Doom workspaces are not available"))
-  (let ((starting-workspace (+workspace-current-name)))
-    (+workspace-switch "files" t)
-    (workbench/open-files)
-    (+workspace-switch starting-workspace t)))
-
-(defvar workbench--startup-workspaces-opened nil
-  "Whether startup workspaces have been opened for this Emacs process.")
-
-(defun workbench--open-startup-workspaces-once (&rest _)
-  "Open startup workspaces once after the first usable frame exists.
-Guards on `display-graphic-p' so the daemon's frameless `emacs-startup-hook'
-call is skipped and the setup runs from `server-after-make-frame-hook', once
-a real frame exists and the current workspace is the dashboard."
-  (when (and (not workbench--startup-workspaces-opened)
-             (display-graphic-p))
-    (setq workbench--startup-workspaces-opened t)
-    (run-at-time 0.2 nil #'workbench/open-startup-workspaces)))
-
-(add-hook 'emacs-startup-hook #'workbench--open-startup-workspaces-once)
-(add-hook 'server-after-make-frame-hook #'workbench--open-startup-workspaces-once)

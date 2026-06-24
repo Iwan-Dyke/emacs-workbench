@@ -8,4 +8,5 @@
 (load! "modules/tools/terminals")
 (load! "modules/workflows/coding")
 (load! "modules/workflows/ai")
+(load! "modules/workflows/session")
 (load! "modules/system/keybindings")

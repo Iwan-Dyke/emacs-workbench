@@ -26,11 +26,12 @@ Working so far:
 - focused sync wrapper
 - profile-specific personal/work daemons
 - Doom workspaces
+- startup workspaces (files browser + default AI agent)
 - project/file navigation entrypoints
 - Magit project status entrypoint
 - Dirvish/Dired file-manager entrypoint
-- general vterm entrypoint
-- profile-aware AI terminal commands
+- tmux-like terminal workspaces
+- profile-aware AI: full-window agent workspace and toggled project panes
 - basic Space leader key surface
 - frame close and daemon shutdown commands
 
@@ -94,18 +95,22 @@ just stop work
 Custom workbench keybindings use Doom's Space leader.
 
 ```text
-SPC f f   open files
+SPC e     toggle project tree
+SPC f f   find file in project
+SPC f m   open file manager (Dirvish)
 SPC g g   open Git status
 SPC p p   switch project
 SPC p f   find project file
 SPC p s   search project
+SPC p o   open project workspace
 SPC w p   show active profile
 SPC w a   show default AI tool
-SPC t t   open workbench terminal
-SPC a a   open profile default AI
-SPC a c   open Codex
-SPC a k   open Kiro
-SPC a l   open Claude
+SPC w s   open startup workspaces
+SPC t t   new terminal workspace
+SPC t c   toggle Claude project pane
+SPC t k   toggle Kiro project pane
+SPC t x   toggle Codex project pane
+SPC a a   open profile default AI workspace
 SPC q f   close frame
 SPC q q   stop daemon
 ```

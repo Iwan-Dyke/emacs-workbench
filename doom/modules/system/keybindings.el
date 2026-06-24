@@ -9,17 +9,13 @@
        :desc "Open startup workspaces" "s" #'workbench/open-startup-workspaces)
 
       (:prefix-map ("t" . "terminals")
-       :desc "Open terminal" "t" #'workbench/open-terminal
+       :desc "New terminal workspace" "t" #'workbench/open-terminal-workspace
        :desc "Toggle Claude pane" "c" #'workbench/toggle-project-claude
        :desc "Toggle Kiro pane" "k" #'workbench/toggle-project-kiro
        :desc "Toggle Codex pane" "x" #'workbench/toggle-project-codex)
 
       (:prefix-map ("a" . "AI")
-       :desc "Open default AI" "a" #'workbench/open-default-ai
-       :desc "Open Codex" "c" #'workbench/open-codex
-       :desc "Open Kiro" "k" #'workbench/open-kiro
-       :desc "Open Claude" "l" #'workbench/open-claude
-       :desc "Toggle project AI pane" "p" #'workbench/toggle-project-ai)
+       :desc "Open default AI workspace" "a" #'workbench/open-default-ai-workspace)
 
       (:prefix-map ("q" . "quit/session")
        :desc "Close frame" "f" #'workbench/close-frame

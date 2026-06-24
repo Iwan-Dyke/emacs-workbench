@@ -1,6 +1,8 @@
 ;;; tools/terminals.el -*- lexical-binding: t; -*-
 
-(defun workbench/open-terminal ()
-  "Open the main workbench terminal."
+(defun workbench/open-terminal-workspace ()
+  "Open a new workspace with a fresh terminal, like a tmux new window.
+Type whatever you want in it: a shell command or an AI agent."
   (interactive)
-  (vterm "*workbench-terminal*"))
+  (+workspace/new)
+  (vterm (generate-new-buffer-name "*terminal*")))

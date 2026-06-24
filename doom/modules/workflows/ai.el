@@ -1,42 +1,39 @@
 ;;; workflows/ai.el -*- lexical-binding: t; -*-
 
-(defun workbench--open-vterm-command (buffer-name command)
-  "Open BUFFER-NAME in vterm and run COMMAND when creating it."
-  (if (get-buffer buffer-name)
-      (pop-to-buffer buffer-name)
-    (let ((buffer (vterm buffer-name)))
-      (with-current-buffer buffer
-        (vterm-send-string command)
-        (vterm-send-return)))))
+;; Two AI scopes (ADR 0034). Global/session agents run full-window in the "ai"
+;; workspace; project AI panes dock on the far right of a coding layout
+;; (ADR 0048). Buffer names stay simple (ADR 0035): *<tool>* for session agents,
+;; *project-<tool>* for the panes.
 
-(defun workbench/open-codex ()
-  "Open Codex in a workbench terminal."
+(defvar workbench/ai-commands
+  '(("claude" . "claude")
+    ("kiro"   . "kiro-cli")
+    ("codex"  . "codex"))
+  "Alist mapping an AI tool name to its launch command.")
+
+(defun workbench--ai-command (tool)
+  "Return the launch command string for TOOL."
+  (or (cdr (assoc tool workbench/ai-commands))
+      (user-error "No command configured for AI tool: %s" tool)))
+
+(defun workbench--open-agent-workspace (tool)
+  "Open TOOL full-window in the \"ai\" workspace, launching it once."
+  (let ((buffer-name (format "*%s*" tool)))
+    (+workspace-switch "ai" t)
+    (if (get-buffer buffer-name)
+        (switch-to-buffer buffer-name)
+      (vterm buffer-name)
+      (vterm-send-string (workbench--ai-command tool))
+      (vterm-send-return))
+    (delete-other-windows)))
+
+(defun workbench/open-default-ai-workspace ()
+  "Open the profile default AI agent full-window in the \"ai\" workspace."
   (interactive)
-  (workbench--open-vterm-command "*codex*" "codex"))
+  (workbench--open-agent-workspace workbench/default-ai-tool))
 
-(defun workbench/open-kiro ()
-  "Open Kiro in a workbench terminal."
-  (interactive)
-  (workbench--open-vterm-command "*kiro*" "kiro"))
-
-(defun workbench/open-claude ()
-  "Open Claude in a workbench terminal."
-  (interactive)
-  (workbench--open-vterm-command "*claude*" "claude"))
-
-(defun workbench/open-default-ai ()
-  "Open the default AI tool for the active workbench profile."
-  (interactive)
-  (pcase workbench/default-ai-tool
-    ("codex" (workbench/open-codex))
-    ("kiro" (workbench/open-kiro))
-    ("claude" (workbench/open-claude))
-    (_ (user-error "Unknown default AI tool: %s" workbench/default-ai-tool))))
-
-;; Project/layout AI: the right-side pane in the coding layout (ADR 0034),
-;; modelled on the user's Neovim toggleterm AI terminals (ADR 0048) — a
-;; 25-column vertical pane on the far right, toggled, exclusive, focus-taking.
-;; Distinct from the global/session AI above; *project-<tool>* buffers (ADR 0035).
+;; Modelled on the user's Neovim toggleterm AI terminals (ADR 0048; see also
+;; ADR 0034, ADR 0035).
 
 (defconst workbench-project-ai-buffers
   '("*project-codex*" "*project-kiro*" "*project-claude*")
@@ -83,23 +80,14 @@ Hides any other project AI pane first so only one is visible (exclusive)."
 (defun workbench/toggle-project-codex ()
   "Toggle Codex as the project AI pane."
   (interactive)
-  (workbench--toggle-project-ai "*project-codex*" "codex"))
+  (workbench--toggle-project-ai "*project-codex*" (workbench--ai-command "codex")))
 
 (defun workbench/toggle-project-kiro ()
   "Toggle Kiro as the project AI pane."
   (interactive)
-  (workbench--toggle-project-ai "*project-kiro*" "kiro"))
+  (workbench--toggle-project-ai "*project-kiro*" (workbench--ai-command "kiro")))
 
 (defun workbench/toggle-project-claude ()
   "Toggle Claude as the project AI pane."
   (interactive)
-  (workbench--toggle-project-ai "*project-claude*" "claude"))
-
-(defun workbench/toggle-project-ai ()
-  "Toggle the profile default AI as the project pane (ADR 0034)."
-  (interactive)
-  (pcase workbench/default-ai-tool
-    ("codex" (workbench/toggle-project-codex))
-    ("kiro" (workbench/toggle-project-kiro))
-    ("claude" (workbench/toggle-project-claude))
-    (_ (user-error "Unknown default AI tool: %s" workbench/default-ai-tool))))
+  (workbench--toggle-project-ai "*project-claude*" (workbench--ai-command "claude")))

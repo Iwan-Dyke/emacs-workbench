@@ -3,6 +3,8 @@
 Date: 2026-06-23
 Status: Accepted
 
+Partially superseded by 0050.
+
 ## Context
 
 The first-pass coding workflow starts from the Doom dashboard, then uses
