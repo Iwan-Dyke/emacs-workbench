@@ -33,43 +33,73 @@
     ("claude" (workbench/open-claude))
     (_ (user-error "Unknown default AI tool: %s" workbench/default-ai-tool))))
 
-;; Project/layout AI: the right-side pane in the coding layout (ADR 0034).
-;; Distinct from the global/session AI buffers above; named *project-<tool>*
-;; (ADR 0035). Owned by the coding workflow (ADR 0039).
+;; Project/layout AI: the right-side pane in the coding layout (ADR 0034),
+;; modelled on the user's Neovim toggleterm AI terminals (ADR 0048) — a
+;; 25-column vertical pane on the far right, toggled, exclusive, focus-taking.
+;; Distinct from the global/session AI above; *project-<tool>* buffers (ADR 0035).
 
-(defun workbench--open-project-ai (buffer-name command)
-  "Open BUFFER-NAME as a right-side AI vterm, running COMMAND on creation.
-Focuses the pane if it already exists rather than restarting it."
+(defconst workbench-project-ai-buffers
+  '("*project-codex*" "*project-kiro*" "*project-claude*")
+  "All project AI pane buffer names.")
+
+(defvar workbench-project-ai-width 0.4
+  "Width of the project AI pane.
+An integer is a column count; a float is a fraction of the frame width.")
+
+(defun workbench--project-ai-window ()
+  "Return a visible window showing any project AI buffer, or nil."
+  (seq-some (lambda (name)
+              (when-let ((buffer (get-buffer name)))
+                (get-buffer-window buffer)))
+            workbench-project-ai-buffers))
+
+(defun workbench--show-project-ai (buffer-name command)
+  "Show BUFFER-NAME as the far-right AI pane, creating it with COMMAND.
+Hides any other project AI pane first so only one is visible (exclusive)."
+  (when-let ((other (workbench--project-ai-window)))
+    (delete-window other))
   (let* ((existing (get-buffer buffer-name))
          (buffer (or existing (get-buffer-create buffer-name)))
-         (window (display-buffer-in-side-window
-                  buffer '((side . right) (window-width . 0.33)))))
+         (window (display-buffer
+                  buffer
+                  `((display-buffer-in-direction)
+                    (direction . right)
+                    (window . root)
+                    (window-width . ,workbench-project-ai-width)))))
     (select-window window)
     (unless existing
       (vterm-mode)
       (vterm-send-string command)
       (vterm-send-return))))
 
-(defun workbench/open-project-codex ()
-  "Open Codex as the project AI pane."
-  (interactive)
-  (workbench--open-project-ai "*project-codex*" "codex"))
+(defun workbench--toggle-project-ai (buffer-name command)
+  "Toggle BUFFER-NAME as the project AI pane running COMMAND."
+  (let ((window (and (get-buffer buffer-name)
+                     (get-buffer-window buffer-name))))
+    (if window
+        (delete-window window)
+      (workbench--show-project-ai buffer-name command))))
 
-(defun workbench/open-project-kiro ()
-  "Open Kiro as the project AI pane."
+(defun workbench/toggle-project-codex ()
+  "Toggle Codex as the project AI pane."
   (interactive)
-  (workbench--open-project-ai "*project-kiro*" "kiro"))
+  (workbench--toggle-project-ai "*project-codex*" "codex"))
 
-(defun workbench/open-project-claude ()
-  "Open Claude as the project AI pane."
+(defun workbench/toggle-project-kiro ()
+  "Toggle Kiro as the project AI pane."
   (interactive)
-  (workbench--open-project-ai "*project-claude*" "claude"))
+  (workbench--toggle-project-ai "*project-kiro*" "kiro"))
 
-(defun workbench/open-project-ai ()
-  "Open the profile default AI as the project right-side pane (ADR 0034)."
+(defun workbench/toggle-project-claude ()
+  "Toggle Claude as the project AI pane."
+  (interactive)
+  (workbench--toggle-project-ai "*project-claude*" "claude"))
+
+(defun workbench/toggle-project-ai ()
+  "Toggle the profile default AI as the project pane (ADR 0034)."
   (interactive)
   (pcase workbench/default-ai-tool
-    ("codex" (workbench/open-project-codex))
-    ("kiro" (workbench/open-project-kiro))
-    ("claude" (workbench/open-project-claude))
+    ("codex" (workbench/toggle-project-codex))
+    ("kiro" (workbench/toggle-project-kiro))
+    ("claude" (workbench/toggle-project-claude))
     (_ (user-error "Unknown default AI tool: %s" workbench/default-ai-tool))))

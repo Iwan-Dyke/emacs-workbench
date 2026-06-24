@@ -9,14 +9,17 @@
        :desc "Open startup workspaces" "s" #'workbench/open-startup-workspaces)
 
       (:prefix-map ("t" . "terminals")
-       :desc "Open terminal" "t" #'workbench/open-terminal)
+       :desc "Open terminal" "t" #'workbench/open-terminal
+       :desc "Toggle Claude pane" "c" #'workbench/toggle-project-claude
+       :desc "Toggle Kiro pane" "k" #'workbench/toggle-project-kiro
+       :desc "Toggle Codex pane" "x" #'workbench/toggle-project-codex)
 
       (:prefix-map ("a" . "AI")
        :desc "Open default AI" "a" #'workbench/open-default-ai
        :desc "Open Codex" "c" #'workbench/open-codex
        :desc "Open Kiro" "k" #'workbench/open-kiro
        :desc "Open Claude" "l" #'workbench/open-claude
-       :desc "Open project AI pane" "p" #'workbench/open-project-ai)
+       :desc "Toggle project AI pane" "p" #'workbench/toggle-project-ai)
 
       (:prefix-map ("q" . "quit/session")
        :desc "Close frame" "f" #'workbench/close-frame
@@ -41,3 +44,12 @@
       "C-j" #'evil-window-down
       "C-k" #'evil-window-up
       "C-l" #'workbench/window-right)
+
+;; Keep window navigation working from inside vterm (e.g. the AI pane),
+;; so the terminal is never a focus trap (ADR 0048).
+(after! vterm
+  (map! :map vterm-mode-map
+        "C-h" #'workbench/window-left
+        "C-j" #'evil-window-down
+        "C-k" #'evil-window-up
+        "C-l" #'workbench/window-right))
