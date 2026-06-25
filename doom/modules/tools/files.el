@@ -80,8 +80,13 @@ current project (or `default-directory') and focuses it."
       (workbench--treemacs-display (workbench--project-root)))))
 
 (after! treemacs
+  ;; Unlock the tree's width so it can be resized like any other window
+  ;; (SPC w r). Locked is the Treemacs default: it sets `window-size-fixed' to
+  ;; `width', and `enlarge-window-horizontally' then refuses with "window is
+  ;; fixed size". `treemacs-width' still sets the initial width.
   (setq treemacs-position 'left
         treemacs-width 25
+        treemacs-width-is-locked nil
         treemacs-show-hidden-files t)
   (treemacs-follow-mode +1)
   (treemacs-git-mode 'deferred))
