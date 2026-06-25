@@ -114,12 +114,57 @@ install_apt_platform_tools() {
     fi
 }
 
+# Nerd Fonts symbols font for nerd-icons (treemacs/UI icons). Emacs ships the
+# nerd-icons package but not the font, so without this the icons render as empty
+# boxes. Non-fatal: a missing font only affects appearance, so failures warn
+# rather than fail the whole install.
+nerd_font_url="https://raw.githubusercontent.com/rainstormstudio/nerd-icons.el/main/fonts/NFM.ttf"
+
+install_icon_fonts() {
+    local fonts_dir font_path
+
+    if [ "$platform" = "Darwin" ]; then
+        fonts_dir="$HOME/Library/Fonts"
+    else
+        fonts_dir="$HOME/.local/share/fonts"
+    fi
+    font_path="$fonts_dir/NFM.ttf"
+
+    if [ -f "$font_path" ]; then
+        printf "ok  nerd-icons font already installed\n"
+        return
+    fi
+
+    mkdir -p "$fonts_dir"
+
+    if have_command curl; then
+        run "download nerd-icons font" curl -fsSL -o "$font_path" "$nerd_font_url" || {
+            warn "could not download nerd-icons font; icons may be missing"
+            return
+        }
+    elif have_command wget; then
+        run "download nerd-icons font" wget -qO "$font_path" "$nerd_font_url" || {
+            warn "could not download nerd-icons font; icons may be missing"
+            return
+        }
+    else
+        warn "neither curl nor wget found; skipping nerd-icons font"
+        return
+    fi
+
+    if [ "$platform" != "Darwin" ] && have_command fc-cache; then
+        run "refresh font cache" fc-cache -f "$fonts_dir" || true
+    fi
+}
+
 case "$platform" in
 Darwin)
     install_macos_platform_tools
+    install_icon_fonts
     ;;
 Linux)
     install_apt_platform_tools
+    install_icon_fonts
     ;;
 *)
     fail "unsupported platform: $platform"

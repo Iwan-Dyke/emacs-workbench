@@ -56,6 +56,13 @@ check_optional_command codex
 check_optional_command kiro
 check_optional_command claude
 
+# Nerd-icons font for treemacs/UI icons (installed by platform-tools)
+if [ -f "$HOME/.local/share/fonts/NFM.ttf" ] || [ -f "$HOME/Library/Fonts/NFM.ttf" ]; then
+    printf "ok  nerd-icons font installed\n"
+else
+    printf "warn nerd-icons font not found (M-x nerd-icons-install-fonts)\n"
+fi
+
 # Language servers (ADR 0017, ADR 0029)
 check_optional_command pyright
 check_optional_command gopls
