@@ -9,10 +9,12 @@
   (let* ((path (directory-file-name (file-truename directory)))
          (name (file-name-nondirectory path))
          (parent (file-name-nondirectory
-                  (directory-file-name (file-name-directory path)))))
-    (if (string-empty-p parent)
-        name
-      (format "%s-%s" parent name))))
+                  (directory-file-name (file-name-directory path))))
+         (base (if (string-empty-p parent)
+                   name
+                 (format "%s-%s" parent name)))
+         (hash (substring (secure-hash 'sha1 path) 0 6)))
+    (format "%s-%s" base hash)))
 
 (defun workbench/open-project-dashboard (directory)
   "Open the project dashboard for DIRECTORY."
