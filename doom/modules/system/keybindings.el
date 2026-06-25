@@ -6,7 +6,8 @@
       (:prefix-map ("w" . "workbench")
        :desc "Show profile" "p" #'workbench/show-profile
        :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool
-       :desc "Open startup workspaces" "s" #'workbench/open-startup-workspaces)
+       :desc "Open startup workspaces" "s" #'workbench/open-startup-workspaces
+       :desc "Resize windows" "r" #'workbench/resize-mode)
 
       (:prefix-map ("t" . "terminals")
        :desc "New terminal workspace" "t" #'workbench/open-terminal-workspace

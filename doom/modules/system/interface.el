@@ -37,3 +37,65 @@ From the Treemacs tree, return to the editing window."
     (error
      (when (eq (selected-window) (workbench--treemacs-window))
        (other-window 1)))))
+
+;; Window resizing. The default Emacs/Doom resize bindings are one-shot chords,
+;; which makes meaningful resizing tedious. Enter a transient resize state, then
+;; tap bare h/j/k/l to resize the selected window repeatedly until you press a
+;; key outside the map (e.g. ESC). The keys mirror the C-h/j/k/l navigation.
+
+(defvar workbench/resize-step 4
+  "Number of columns or lines each resize keypress adjusts a window by.")
+
+;; Resize directionally: h/l move the vertical divider left/right and j/k move
+;; the horizontal divider down/up, regardless of which window is selected. A
+;; plain enlarge/shrink would feel inverted in a window docked on the right or
+;; bottom (e.g. the AI pane), because there \"grow\" pulls the divider the other
+;; way. Keying off the neighbor in each direction keeps the divider moving the
+;; way you press.
+
+(defun workbench/resize-left ()
+  "Move the selected window's vertical divider left by `workbench/resize-step'."
+  (interactive)
+  (if (window-in-direction 'right)
+      (shrink-window-horizontally workbench/resize-step)
+    (enlarge-window-horizontally workbench/resize-step)))
+
+(defun workbench/resize-right ()
+  "Move the selected window's vertical divider right by `workbench/resize-step'."
+  (interactive)
+  (if (window-in-direction 'right)
+      (enlarge-window-horizontally workbench/resize-step)
+    (shrink-window-horizontally workbench/resize-step)))
+
+(defun workbench/resize-down ()
+  "Move the selected window's horizontal divider down by `workbench/resize-step'."
+  (interactive)
+  (if (window-in-direction 'below)
+      (enlarge-window workbench/resize-step)
+    (shrink-window workbench/resize-step)))
+
+(defun workbench/resize-up ()
+  "Move the selected window's horizontal divider up by `workbench/resize-step'."
+  (interactive)
+  (if (window-in-direction 'below)
+      (shrink-window workbench/resize-step)
+    (enlarge-window workbench/resize-step)))
+
+(defvar workbench-resize-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "h" #'workbench/resize-left)
+    (define-key map "l" #'workbench/resize-right)
+    (define-key map "j" #'workbench/resize-down)
+    (define-key map "k" #'workbench/resize-up)
+    (define-key map "=" #'balance-windows)
+    map)
+  "Transient keymap for repeatable window resizing.")
+
+(defun workbench/resize-mode ()
+  "Enter a transient window-resize state.
+Tap h/l to adjust width and j/k to adjust height, repeatedly; = balances
+all windows; any other key (e.g. ESC) exits."
+  (interactive)
+  (message "Resize: h/l width  j/k height  = balance  (any other key exits)")
+  (set-transient-map workbench-resize-map t
+                     (lambda () (message "Resize done"))))
