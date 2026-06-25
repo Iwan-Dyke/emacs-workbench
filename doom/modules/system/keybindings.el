@@ -11,6 +11,7 @@
 
       (:prefix-map ("t" . "terminals")
        :desc "New terminal workspace" "t" #'workbench/open-terminal-workspace
+       :desc "Toggle popup terminal" "p" #'workbench/toggle-popup-terminal
        :desc "Toggle Claude pane" "c" #'workbench/toggle-project-claude
        :desc "Toggle Kiro pane" "k" #'workbench/toggle-project-kiro
        :desc "Toggle Codex pane" "x" #'workbench/toggle-project-codex)
@@ -46,6 +47,14 @@
       "C-k" #'evil-window-up
       "C-l" #'workbench/window-right)
 
+;; Popup terminal, mirroring the Neovim toggleterm C-t. Bind in the evil
+;; normal/visual/motion state maps, not just the global map: the workspaces
+;; module binds C-t to +workspace/new in `evil-normal-state-map', which outranks
+;; a plain global binding and was silently spawning a workspace instead. Insert
+;; state is left alone (so C-t still types normally while editing); the terminal
+;; gets its own binding in the vterm block below.
+(map! :nvm "C-t" #'workbench/toggle-popup-terminal)
+
 ;; Keep window navigation working from inside vterm (e.g. the AI pane),
 ;; so the terminal is never a focus trap (ADR 0048).
 (after! vterm
@@ -53,4 +62,6 @@
         "C-h" #'workbench/window-left
         "C-j" #'evil-window-down
         "C-k" #'evil-window-up
-        "C-l" #'workbench/window-right))
+        "C-l" #'workbench/window-right
+        ;; Dismiss the popup from inside it, like toggleterm's terminal-mode C-t.
+        "C-t" #'workbench/toggle-popup-terminal))
