@@ -9,6 +9,9 @@ notes, AI tools, and compatibility workflows.
 - `doom/modules/` contains small workbench modules.
 - `doom/profiles/` contains tracked profile defaults and local override
   examples.
+- `install.sh` is the root install entrypoint.
+- `bin/install.d/platform-tools` installs required platform prerequisites.
+- `bin/install.d/language-tools` installs optional language servers and formatters.
 - `bin/doctor` checks local setup without changing anything.
 - `bin/sync` runs `doom sync`.
 - `bin/workbench` launches and manages profile-specific Emacs daemons.
@@ -22,6 +25,8 @@ This project is in first-pass implementation.
 Working so far:
 
 - Doom config symlink/install skeleton
+- macOS and Debian/Ubuntu/WSL install bootstrap
+- root install entrypoint and user launch commands
 - read-only doctor script
 - focused sync wrapper
 - profile-specific personal/work daemons
@@ -56,6 +61,33 @@ to the directory and file you last browsed when you switch back to it.
 
 ## Commands
 
+Install or repair the local workbench setup:
+
+```bash
+./install.sh
+```
+
+On macOS, install Homebrew first if it is not already present. The installer
+uses Homebrew for Emacs, Doom prerequisites, language servers, and formatters.
+
+On Linux/WSL, the installer supports Debian/Ubuntu-style systems with
+`apt-get`. Other Linux package managers are not automated yet.
+
+The installer bootstraps supported host prerequisites, installs Doom when
+missing, links this repo as the Doom config, runs Doom sync, creates the
+`startup`, `startup-work`, and `workbench` commands, and finishes with the
+doctor report.
+
+Platform prerequisites and optional coding tools can also be rerun separately:
+
+```bash
+bin/install.d/platform-tools
+bin/install.d/language-tools
+```
+
+AI CLIs are intentionally user-managed. The installer does not install Codex,
+Claude, or Kiro; `doctor` only reports whether they are available.
+
 Check local setup:
 
 ```bash
@@ -77,18 +109,22 @@ just check
 Launch the personal workbench:
 
 ```bash
+startup
 just personal
 ```
 
 Launch the work workbench:
 
 ```bash
+startup-work
 just work
 ```
 
 Restart a profile daemon:
 
 ```bash
+workbench restart personal
+workbench restart work
 just restart personal
 just restart work
 ```
@@ -96,6 +132,8 @@ just restart work
 Stop a profile daemon:
 
 ```bash
+workbench stop personal
+workbench stop work
 just stop personal
 just stop work
 ```

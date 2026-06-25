@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -u
+
+platform="${WORKBENCH_PLATFORM_OVERRIDE:-$(uname -s)}"
+status=0
+
+macos_core_packages=(
+    git
+    ripgrep
+    fd
+    coreutils
+    cmake
+    libtool
+    pkg-config
+    emacs-plus
+)
+
+apt_core_packages=(
+    git
+    emacs
+    ripgrep
+    fd-find
+    build-essential
+    cmake
+    libtool-bin
+    pkg-config
+    python3
+    python3-pip
+    python3-venv
+)
+
+fail() {
+    printf "fail %s\n" "$1"
+    status=1
+}
+
+warn() {
+    printf "warn %s\n" "$1"
+}
+
+run() {
+    local description="$1"
+    local arg
+
+    shift
+    printf "+ %s" "$description"
+    for arg in "$@"; do
+        printf " %s" "$arg"
+    done
+    printf "\n"
+
+    "$@"
+}
+
+must_run() {
+    if run "$@"; then
+        return 0
+    fi
+
+    fail "$1 failed"
+    return 1
+}
+
+have_command() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+sudo_prefix() {
+    if [ "$(id -u)" -eq 0 ]; then
+        :
+    elif have_command sudo; then
+        printf "sudo\n"
+    else
+        fail "sudo not found; install prerequisites manually or run as root"
+        return 1
+    fi
+}
+
+install_macos_platform_tools() {
+    if ! have_command brew; then
+        fail "Homebrew not found"
+        printf "Install Homebrew first:\n"
+        printf '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"\n'
+        return
+    fi
+
+    if ! xcode-select -p >/dev/null 2>&1; then
+        warn "Xcode command line tools not found"
+        run "request Xcode command line tools install" xcode-select --install || true
+        fail "finish Xcode command line tools install, then rerun ./install.sh"
+        return
+    fi
+
+    must_run "tap emacs-plus" brew tap d12frosted/emacs-plus || return
+    must_run "install Homebrew core prerequisites" brew install "${macos_core_packages[@]}"
+}
+
+install_apt_platform_tools() {
+    local sudo_cmd
+
+    if ! have_command apt-get; then
+        fail "unsupported Linux package manager; apt-get not found"
+        return
+    fi
+
+    sudo_cmd="$(sudo_prefix)" || return
+
+    if [ -n "$sudo_cmd" ]; then
+        must_run "update apt package lists" "$sudo_cmd" apt-get update || return
+        must_run "install apt core prerequisites" "$sudo_cmd" apt-get install -y "${apt_core_packages[@]}"
+    else
+        must_run "update apt package lists" apt-get update || return
+        must_run "install apt core prerequisites" apt-get install -y "${apt_core_packages[@]}"
+    fi
+}
+
+case "$platform" in
+Darwin)
+    install_macos_platform_tools
+    ;;
+Linux)
+    install_apt_platform_tools
+    ;;
+*)
+    fail "unsupported platform: $platform"
+    ;;
+esac
+
+exit "$status"

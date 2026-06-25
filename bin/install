@@ -4,15 +4,15 @@ set -u
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 doom_source="$repo_root/doom"
 doom_target="$HOME/.config/doom"
+user_bin="$HOME/.local/bin"
+workbench_bin="$repo_root/bin/workbench"
+platform_tools_bin="$repo_root/bin/install.d/platform-tools"
+language_tools_bin="$repo_root/bin/install.d/language-tools"
+doom_repo="${WORKBENCH_DOOM_REPO:-https://github.com/doomemacs/doomemacs}"
+platform="${WORKBENCH_PLATFORM_OVERRIDE:-$(uname -s)}"
+wrapper_marker="# Managed by emacs-workbench install"
 
 status=0
-
-doom_bin=""
-if command -v doom >/dev/null 2>&1; then
-    doom_bin="$(command -v doom)"
-elif [ -x "$HOME/.emacs.d/bin/doom" ]; then
-    doom_bin="$HOME/.emacs.d/bin/doom"
-fi
 
 fail() {
     printf "fail %s\n" "$1"
@@ -23,45 +23,283 @@ ok() {
     printf "ok  %s\n" "$1"
 }
 
-if command -v emacs >/dev/null 2>&1; then
-    ok "emacs found"
-else
-    fail "emacs not found"
-fi
+warn() {
+    printf "warn %s\n" "$1"
+}
 
-if [ -n "$doom_bin" ]; then
-    ok "doom found: $doom_bin"
-else
-    fail "doom command not found"
-fi
+run() {
+    local description="$1"
+    local arg
 
-if [ ! -d "$doom_source" ]; then
-    fail "repo doom directory missing: $doom_source"
-fi
+    shift
+    printf "+ %s" "$description"
+    for arg in "$@"; do
+        printf " %s" "$arg"
+    done
+    printf "\n"
 
-if [ -L "$doom_target" ]; then
-    current_target="$(readlink "$doom_target")"
+    "$@"
+}
 
-    if [ "$current_target" = "$doom_source" ]; then
-        ok "$doom_target already links to repo doom config"
-    else
-        fail "$doom_target links to somewhere else: $current_target"
+try_run() {
+    if run "$@"; then
+        return 0
     fi
-elif [ -e "$doom_target" ]; then
-    fail "$doom_target exists and is not a symlink"
-else
-    mkdir -p "$(dirname "$doom_target")"
-    ln -s "$doom_source" "$doom_target"
-    ok "linked $doom_target -> $doom_source"
-fi
+
+    warn "$1 failed"
+    return 0
+}
+
+must_run() {
+    if run "$@"; then
+        return 0
+    fi
+
+    fail "$1 failed"
+    return 1
+}
+
+have_command() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+run_if_ok() {
+    if [ "$status" -eq 0 ]; then
+        "$@"
+    fi
+}
+
+find_doom_bin() {
+    if have_command doom; then
+        command -v doom
+    elif [ -x "$HOME/.emacs.d/bin/doom" ]; then
+        printf "%s\n" "$HOME/.emacs.d/bin/doom"
+    fi
+}
+
+ensure_doom_checkout() {
+    local doom_bin
+
+    doom_bin="$(find_doom_bin)"
+    if [ -n "$doom_bin" ]; then
+        ok "doom found: $doom_bin"
+        return
+    fi
+
+    if [ -e "$HOME/.emacs.d" ]; then
+        fail "$HOME/.emacs.d exists but Doom was not found"
+        return
+    fi
+
+    if ! have_command git; then
+        fail "git not found; cannot clone Doom"
+        return
+    fi
+
+    must_run "clone Doom Emacs" git clone --depth 1 "$doom_repo" "$HOME/.emacs.d" || return
+    ok "doom cloned"
+}
+
+install_doom() {
+    local doom_bin
+
+    doom_bin="$(find_doom_bin)"
+    if [ -z "$doom_bin" ]; then
+        fail "doom command not found; cannot install Doom"
+        return
+    fi
+
+    must_run "install Doom Emacs" "$doom_bin" --doomdir "$doom_source" install --no-config --no-env -! || return
+    ok "doom installed"
+}
+
+check_required_tools() {
+    local doom_bin
+
+    if have_command emacs; then
+        ok "emacs found"
+    else
+        fail "emacs not found"
+    fi
+
+    doom_bin="$(find_doom_bin)"
+    if [ -n "$doom_bin" ]; then
+        ok "doom found: $doom_bin"
+    else
+        fail "doom command not found"
+    fi
+
+    if [ -d "$doom_source" ]; then
+        ok "repo doom directory found"
+    else
+        fail "repo doom directory missing: $doom_source"
+    fi
+
+    if [ -x "$workbench_bin" ]; then
+        ok "workbench launcher found"
+    else
+        fail "workbench launcher missing or not executable: $workbench_bin"
+    fi
+}
+
+ensure_doom_config_link() {
+    local current_target
+
+    if [ -L "$doom_target" ]; then
+        current_target="$(readlink "$doom_target")"
+
+        if [ "$current_target" = "$doom_source" ]; then
+            ok "$doom_target already links to repo doom config"
+        else
+            fail "$doom_target links to somewhere else: $current_target"
+        fi
+    elif [ -e "$doom_target" ]; then
+        fail "$doom_target exists and is not a symlink"
+    else
+        mkdir -p "$(dirname "$doom_target")"
+        ln -s "$doom_source" "$doom_target"
+        ok "linked $doom_target -> $doom_source"
+    fi
+}
+
+install_launch_wrapper() {
+    local name="$1"
+    local profile="$2"
+    local target="$user_bin/$name"
+
+    mkdir -p "$user_bin"
+
+    if [ -e "$target" ]; then
+        if wrapper_is_managed "$target" "$profile"; then
+            :
+        else
+            fail "$target exists and is not managed by this workbench"
+            return
+        fi
+    fi
+
+    render_wrapper "$profile" >"$target"
+
+    chmod +x "$target"
+    ok "installed $target"
+}
+
+render_wrapper() {
+    local profile="$1"
+
+    if [ -n "$profile" ]; then
+        printf '#!/usr/bin/env bash\n%s\nexec "%s" %s "$@"\n' "$wrapper_marker" "$workbench_bin" "$profile"
+    else
+        printf '#!/usr/bin/env bash\n%s\nexec "%s" "$@"\n' "$wrapper_marker" "$workbench_bin"
+    fi
+}
+
+wrapper_is_managed() {
+    local target="$1"
+    local profile="$2"
+    local expected
+
+    if grep -F "$wrapper_marker" "$target" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [ -n "$profile" ]; then
+        expected=$(printf '#!/usr/bin/env bash\nexec "%s" %s "$@"\n' "$workbench_bin" "$profile")
+    else
+        expected=$(printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$workbench_bin")
+    fi
+
+    [ "$(cat "$target")" = "$expected" ]
+}
+
+install_launch_wrappers() {
+    install_launch_wrapper startup personal
+    [ "$status" -eq 0 ] || return
+    install_launch_wrapper startup-work work
+    [ "$status" -eq 0 ] || return
+    install_launch_wrapper workbench ""
+}
+
+check_user_bin_path() {
+    case ":$PATH:" in
+    *":$user_bin:"*)
+        ok "$user_bin is on PATH"
+        ;;
+    *)
+        warn "$user_bin is not on PATH"
+        printf "Add this to your shell config:\n"
+        printf "export PATH=\"\$HOME/.local/bin:\$PATH\"\n"
+        ;;
+    esac
+}
+
+print_next_steps() {
+    printf "Next:\n"
+    printf "  startup\n"
+    printf "  startup-work\n"
+    printf "  workbench restart personal\n"
+    printf "  workbench restart work\n"
+}
+
+run_doom_sync() {
+    local doom_bin
+
+    doom_bin="$(find_doom_bin)"
+    if [ -z "$doom_bin" ]; then
+        fail "doom command not found; cannot run sync"
+        return
+    fi
+
+    must_run "sync Doom config" "$doom_bin" sync
+}
+
+run_doom_env_if_needed() {
+    local doom_bin
+
+    if [ "$platform" != "Darwin" ]; then
+        return
+    fi
+
+    doom_bin="$(find_doom_bin)"
+    if [ -z "$doom_bin" ]; then
+        fail "doom command not found; cannot generate env"
+        return
+    fi
+
+    must_run "generate Doom env" "$doom_bin" env
+}
+
+run_doctor_report() {
+    must_run "run workbench doctor" "$repo_root/bin/doctor"
+}
+
+install_platform_tools() {
+    must_run "install platform tools" "$platform_tools_bin"
+}
+
+install_language_tools() {
+    try_run "install language tools" "$language_tools_bin"
+}
+
+run_if_ok install_platform_tools
+run_if_ok ensure_doom_checkout
+run_if_ok check_required_tools
+run_if_ok ensure_doom_config_link
+run_if_ok install_doom
+run_if_ok install_launch_wrappers
+run_if_ok check_user_bin_path
+run_if_ok run_doom_sync
+run_if_ok run_doom_env_if_needed
+run_if_ok install_language_tools
+run_if_ok run_doctor_report
 
 printf "\n"
 
 if [ "$status" -eq 0 ]; then
-    printf "Install skeleton passed\n"
-    printf "Next: ./bin/sync\n"
+    printf "Install passed\n"
+    print_next_steps
 else
-    printf "Install skeleton found problems\n"
+    printf "Install found problems\n"
 fi
 
 exit "$status"

@@ -2,7 +2,7 @@ default:
     just --list
 
 install:
-    ./bin/install
+    ./install.sh
 
 sync:
     ./bin/sync
@@ -11,7 +11,7 @@ doctor:
     ./bin/doctor
 
 check:
-    bash -n ./bin/install ./bin/sync ./bin/doctor ./bin/workbench
+    bash -n ./install.sh ./bin/install ./bin/install.d/platform-tools ./bin/install.d/language-tools ./bin/sync ./bin/doctor ./bin/workbench
     ./bin/doctor
 
 workbench profile="personal":

@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -u
+
+platform="${WORKBENCH_PLATFORM_OVERRIDE:-$(uname -s)}"
+status=0
+
+brew_language_packages=(
+    pyright
+    gopls
+    terraform-ls
+    bash-language-server
+    yaml-language-server
+    lua-language-server
+    sqls
+    ruff
+    stylua
+    shfmt
+    yamlfmt
+    terraform
+)
+
+brew_optional_language_packages=(
+    dockerfile-language-server
+)
+
+apt_optional_language_packages=(
+    pipx
+    golang-go
+    npm
+    shellcheck
+    shfmt
+    lua-language-server
+)
+
+npm_language_packages=(
+    pyright
+    bash-language-server
+    yaml-language-server
+    dockerfile-language-server-nodejs
+)
+
+go_language_packages=(
+    golang.org/x/tools/gopls@latest
+    github.com/hashicorp/terraform-ls@latest
+    github.com/sqls-server/sqls@latest
+    github.com/google/yamlfmt/cmd/yamlfmt@latest
+)
+
+pipx_language_packages=(
+    ruff
+)
+
+warn() {
+    printf "warn %s\n" "$1"
+}
+
+ok() {
+    printf "ok  %s\n" "$1"
+}
+
+run() {
+    local description="$1"
+    local arg
+
+    shift
+    printf "+ %s" "$description"
+    for arg in "$@"; do
+        printf " %s" "$arg"
+    done
+    printf "\n"
+
+    "$@"
+}
+
+try_run() {
+    if run "$@"; then
+        return 0
+    fi
+
+    warn "$1 failed"
+    return 0
+}
+
+have_command() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+sudo_prefix() {
+    if [ "$(id -u)" -eq 0 ]; then
+        :
+    elif have_command sudo; then
+        printf "sudo\n"
+    else
+        warn "sudo not found; skipping sudo-managed language tools"
+        return 1
+    fi
+}
+
+check_extra_path() {
+    local path="$1"
+
+    case ":$PATH:" in
+    *":$path:"*)
+        ok "$path is on PATH"
+        ;;
+    *)
+        warn "$path is not on PATH"
+        printf "Add this to your shell config if installed tools are missing:\n"
+        printf "export PATH=\"%s:\$PATH\"\n" "$path"
+        ;;
+    esac
+}
+
+install_brew_language_tools() {
+    if ! have_command brew; then
+        warn "brew not found; skipping Homebrew language tools"
+        return
+    fi
+
+    try_run "install Homebrew language tools" brew install "${brew_language_packages[@]}"
+    try_run "install optional Homebrew language tools" brew install "${brew_optional_language_packages[@]}"
+}
+
+install_apt_language_tools() {
+    local sudo_cmd="$1"
+
+    if ! have_command apt-get; then
+        warn "apt-get not found; skipping apt language tools"
+        return
+    fi
+
+    if [ -n "$sudo_cmd" ]; then
+        try_run "install optional apt language tools" "$sudo_cmd" apt-get install -y "${apt_optional_language_packages[@]}"
+    else
+        try_run "install optional apt language tools" apt-get install -y "${apt_optional_language_packages[@]}"
+    fi
+}
+
+install_npm_language_tools() {
+    if ! have_command npm; then
+        warn "npm not found; skipping npm language servers"
+        return
+    fi
+
+    try_run "install npm language servers" npm install -g "${npm_language_packages[@]}"
+}
+
+install_go_language_tools() {
+    local package
+
+    if ! have_command go; then
+        warn "go not found; skipping Go-installed language tools"
+        return
+    fi
+
+    for package in "${go_language_packages[@]}"; do
+        try_run "install $package" go install "$package"
+    done
+
+    check_extra_path "$HOME/go/bin"
+}
+
+install_pipx_language_tools() {
+    local package
+
+    if ! have_command pipx; then
+        warn "pipx not found; skipping pipx language tools"
+        return
+    fi
+
+    for package in "${pipx_language_packages[@]}"; do
+        try_run "install $package" pipx install "$package"
+    done
+
+    try_run "ensure pipx path" pipx ensurepath
+}
+
+case "$platform" in
+Darwin)
+    install_brew_language_tools
+    ;;
+Linux)
+    sudo_cmd="$(sudo_prefix || true)"
+    install_apt_language_tools "$sudo_cmd"
+    install_npm_language_tools
+    install_go_language_tools
+    install_pipx_language_tools
+    ;;
+*)
+    warn "unsupported platform for language tools: $platform"
+    ;;
+esac
+
+exit "$status"
