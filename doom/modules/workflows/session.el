@@ -103,6 +103,13 @@ is captured as you browse and survives Dirvish collapsing its layout later."
   "Install the files-workspace position tracker in this Dired buffer."
   (add-hook 'post-command-hook #'workbench--files-track-point nil t))
 
+(defun workbench--files-dirvish-layout-active-p ()
+  "Return non-nil when the current buffer has an active Dirvish layout."
+  (and (fboundp 'dirvish-curr)
+       (fboundp 'dv-curr-layout)
+       (when-let ((dirvish (dirvish-curr)))
+         (dv-curr-layout dirvish))))
+
 (defun workbench--files-workspace-full-frame (&rest _)
   "Show full-frame Dirvish when the files workspace becomes current.
 Deferred with `run-at-time' so it runs after persp has finished restoring the
@@ -114,9 +121,7 @@ workspace's windows. Rebuilds at the directory and file last browsed."
      0 nil
      (lambda ()
        (when (and (equal (+workspace-current-name) "files")
-                  (not (and (fboundp 'dirvish-curr)
-                            (dirvish-curr)
-                            (dv-curr-layout (dirvish-curr)))))
+                  (not (workbench--files-dirvish-layout-active-p)))
          (workbench/open-files-full-frame workbench--files-directory
                                           workbench--files-file))))))
 
