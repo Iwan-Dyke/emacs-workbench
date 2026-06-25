@@ -37,15 +37,31 @@ Leaves the original (dashboard) workspace selected."
 (defvar workbench--startup-workspaces-opened nil
   "Whether startup workspaces have been opened for this Emacs process.")
 
+(defvar workbench--startup-workspaces-scheduled nil
+  "Whether startup workspaces are already scheduled to open.")
+
+(defun workbench--try-open-startup-workspaces ()
+  "Open startup workspaces and mark them opened only after success."
+  (condition-case err
+      (progn
+        (workbench/open-startup-workspaces)
+        (setq workbench--startup-workspaces-opened t
+              workbench--startup-workspaces-scheduled nil))
+    (error
+     (setq workbench--startup-workspaces-scheduled nil)
+     (message "Workbench startup workspaces failed: %s"
+              (error-message-string err)))))
+
 (defun workbench--open-startup-workspaces-once (&rest _)
   "Open startup workspaces once after the first usable graphic frame exists.
 Guards on `display-graphic-p' so the daemon's frameless `emacs-startup-hook'
 call is skipped and the setup runs from `server-after-make-frame-hook', once a
 real frame exists and is large enough to hold the workspace layouts."
   (when (and (not workbench--startup-workspaces-opened)
+             (not workbench--startup-workspaces-scheduled)
              (display-graphic-p))
-    (setq workbench--startup-workspaces-opened t)
-    (run-at-time 0.2 nil #'workbench/open-startup-workspaces)))
+    (setq workbench--startup-workspaces-scheduled t)
+    (run-at-time 0.2 nil #'workbench--try-open-startup-workspaces)))
 
 (add-hook 'emacs-startup-hook #'workbench--open-startup-workspaces-once)
 (add-hook 'server-after-make-frame-hook #'workbench--open-startup-workspaces-once)
