@@ -20,8 +20,10 @@ SPC c f   format buffer or region
 SPC w p   show active profile
 SPC w a   show default AI tool
 SPC w s   open startup workspaces
+SPC w r   enter window resize mode
 
 SPC t t   new terminal workspace
+SPC t p   toggle popup terminal
 SPC t c   toggle Claude project pane
 SPC t k   toggle Kiro project pane
 SPC t x   toggle Codex project pane
@@ -40,6 +42,7 @@ C-h   window left
 C-j   window down
 C-k   window up
 C-l   window right
+C-t   toggle popup terminal
 ```
 
 Doom workspace controls keep their Doom defaults:
