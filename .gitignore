@@ -2,3 +2,4 @@
 doom/profiles/local.el
 doom/profiles/secrets.el
 bin/workbench.local
+*.log
