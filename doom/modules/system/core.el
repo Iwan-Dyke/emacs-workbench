@@ -15,6 +15,9 @@
     (when (file-exists-p path)
       (load! path))))
 
+(defvar workbench/default-ai-tool "claude"
+  "Default AI tool for the active workbench profile. Overridden by profile files.")
+
 (workbench--load-profile-file (concat workbench/profile ".el"))
 (workbench--load-profile-file "local.el")
 (workbench--load-profile-file "secrets.el")
