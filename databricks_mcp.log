@@ -1,0 +1,90 @@
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:00:30+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Starting Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "INFO", "message": "Initializing Databricks MCP server", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "databricks_mcp.server.databricks_mcp_server", "level": "WARNING", "message": "Missing Databricks credentials: DATABRICKS_HOST, DATABRICKS_TOKEN", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListToolsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}
+{"name": "mcp.server.lowlevel.server", "level": "INFO", "message": "Processing request of type ListPromptsRequest", "timestamp": "2026-06-26T09:18:39+0100"}

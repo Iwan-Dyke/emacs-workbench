@@ -266,7 +266,7 @@ run_doom_env_if_needed() {
         return
     fi
 
-    must_run "generate Doom env" "$doom_bin" env
+    must_run "generate Doom env" "$doom_bin" sync --env
 }
 
 run_doctor_report() {

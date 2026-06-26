@@ -81,11 +81,15 @@ current project (or `default-directory') and focuses it."
 
 (after! treemacs
   ;; Unlock the tree's width so it can be resized like any other window
-  ;; (SPC w r). Locked is the Treemacs default: it sets `window-size-fixed' to
-  ;; `width', and `enlarge-window-horizontally' then refuses with "window is
-  ;; fixed size". `treemacs-width' still sets the initial width.
+  ;; (SPC w r). Treemacs has three lock mechanisms:
+  ;;   - `treemacs-width-is-initially-locked': locks on buffer creation
+  ;;   - `treemacs--width-is-locked': internal, re-locks after resize ops
+  ;;   - `treemacs-width-is-locked': public toggle (less reliable)
+  ;; Disable all three; `treemacs-width' still sets the initial size.
   (setq treemacs-position 'left
         treemacs-width 25
+        treemacs-width-is-initially-locked nil
+        treemacs--width-is-locked nil
         treemacs-width-is-locked nil
         treemacs-show-hidden-files t)
   (treemacs-follow-mode +1)
