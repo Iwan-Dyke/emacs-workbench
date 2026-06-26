@@ -89,8 +89,10 @@ current project (or `default-directory') and focuses it."
   (setq treemacs-position 'left
         treemacs-width 25
         treemacs-width-is-initially-locked nil
-        treemacs--width-is-locked nil
         treemacs-width-is-locked nil
         treemacs-show-hidden-files t)
+  ;; Internal var; may disappear in future treemacs versions.
+  (when (boundp 'treemacs--width-is-locked)
+    (setq treemacs--width-is-locked nil))
   (treemacs-follow-mode +1)
   (treemacs-git-mode 'deferred))
