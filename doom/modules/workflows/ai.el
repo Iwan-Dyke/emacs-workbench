@@ -50,8 +50,8 @@ If the buffer exists but the process is dead, kills and relaunches it."
 ;; ADR 0034, ADR 0035). Each workspace gets its own AI pane buffer so switching
 ;; workspaces doesn't bleed context between projects.
 
-(defvar workbench-project-ai-width 0.33
-  "Width of the project AI pane as a fraction of the frame width (ADR 0048).")
+(defvar workbench-project-ai-width 25
+  "Width of the project AI pane in columns (ADR 0048).")
 
 (defun workbench--project-ai-buffer-name (tool)
   "Return the project AI buffer name for TOOL scoped to the current workspace."

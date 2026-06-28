@@ -8,6 +8,12 @@
 
 (require 'nerd-icons nil t)
 
+(defun workbench--dashboard-icon (fn name &rest args)
+  "Call nerd-icons FN with NAME and ARGS, returning empty string if unavailable."
+  (if (fboundp fn)
+      (apply fn name args)
+    ""))
+
 ;;; Faces
 
 (defgroup workbench-dashboard nil
@@ -140,7 +146,7 @@
       (list :files (length files)
             :lines (string-to-number
                     (or (workbench--dashboard-shell directory
-                          "sh" "-c" "git ls-files | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}'")
+                          "sh" "-c" "git ls-files -z | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}'")
                         "0"))))))
 
 (defun workbench--dashboard-contributors (directory)
@@ -158,7 +164,7 @@
                ((file-exists-p (expand-file-name "Cargo.toml" directory)) "rust")
                ((file-exists-p (expand-file-name "package.json" directory)) "node")
                ((file-exists-p (expand-file-name "Makefile" directory)) "make")
-               ((file-exists-p (expand-file-name "Terraform" directory)) "terraform")
+               ((file-directory-p (expand-file-name ".terraform" directory)) "terraform")
                (t nil))))
     (list :name (workbench--directory-name directory)
           :path (abbreviate-file-name directory)
@@ -207,16 +213,6 @@ Returns alist of (language . count) sorted by count descending, top 5."
         (maphash (lambda (k v) (push (cons k v) pairs)) counts)
         (setq pairs (sort pairs (lambda (a b) (> (cdr a) (cdr b)))))
         (seq-take pairs 5)))))
-
-(defun workbench--dashboard-commands (directory)
-  "Collect available commands from DIRECTORY's task runner."
-  (let ((justfile (expand-file-name "justfile" directory)))
-    (if (file-exists-p justfile)
-        (workbench--dashboard-shell-lines directory "just" "--list" "--unsorted")
-      (let ((makefile (expand-file-name "Makefile" directory)))
-        (when (file-exists-p makefile)
-          (workbench--dashboard-shell-lines directory
-            "make" "-qp" "--no-print-directory"))))))
 
 (defun workbench--dashboard-commands-justfile (directory)
   "Parse justfile recipe names from DIRECTORY."
@@ -317,7 +313,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
 (defun workbench--dashboard-render-overview (data)
   "Render the overview section from DATA plist."
   (insert "\n")
-  (insert "  " (nerd-icons-octicon "nf-oct-repo" :face 'workbench-dashboard-project-name)
+  (insert "  " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-repo" :face 'workbench-dashboard-project-name)
           " " (propertize (plist-get data :name) 'face 'workbench-dashboard-project-name) "\n")
   (insert "  " (propertize (plist-get data :path) 'face 'workbench-dashboard-path) "\n")
   (when-let ((desc (plist-get data :description)))
@@ -328,14 +324,14 @@ Returns alist of (language . count) sorted by count descending, top 5."
     (when (or size contribs)
       (insert "  ")
       (when size
-        (insert (nerd-icons-octicon "nf-oct-file") " "
+        (insert (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-file") " "
                 (propertize (format "%d files" (plist-get size :files)) 'face 'shadow))
         (when (> (plist-get size :lines) 0)
           (insert (propertize (format ", %dk lines" (/ (plist-get size :lines) 1000))
                               'face 'shadow))))
       (when contribs
         (when size (insert "    "))
-        (insert (nerd-icons-octicon "nf-oct-people") " ")
+        (insert (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-people") " ")
         (let ((first t))
           (dolist (c contribs)
             (unless first (insert (propertize ", " 'face 'shadow)))
@@ -348,17 +344,17 @@ Returns alist of (language . count) sorted by count descending, top 5."
 (defun workbench--dashboard-render-git (data)
   "Render the git section from DATA plist."
   (workbench--dashboard-separator)
-  (workbench--dashboard-render-heading (nerd-icons-devicon "nf-dev-git_branch") "Git")
+  (workbench--dashboard-render-heading (workbench--dashboard-icon 'nerd-icons-devicon "nf-dev-git_branch") "Git")
   (if (not data)
       (insert "    " (propertize "not a git repository" 'face 'shadow) "\n\n")
-    (insert "    " (nerd-icons-octicon "nf-oct-git_branch")
+    (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-git_branch")
             " " (propertize (plist-get data :branch) 'face 'workbench-dashboard-branch))
     (let ((mod (plist-get data :modified))
           (unt (plist-get data :untracked)))
       (if (and (zerop mod) (zerop unt))
-          (insert "  " (nerd-icons-octicon "nf-oct-check" :face 'workbench-dashboard-clean)
+          (insert "  " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-check" :face 'workbench-dashboard-clean)
                   " " (propertize "clean" 'face 'workbench-dashboard-clean))
-        (insert "  " (nerd-icons-octicon "nf-oct-dot_fill" :face 'workbench-dashboard-dirty)
+        (insert "  " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-dot_fill" :face 'workbench-dashboard-dirty)
                 " " (propertize (format "%d modified" mod) 'face 'workbench-dashboard-dirty))
         (when (> unt 0)
           (insert (propertize (format " +%d untracked" unt) 'face 'shadow)))))
@@ -367,11 +363,11 @@ Returns alist of (language . count) sorted by count descending, top 5."
           (behind (plist-get data :behind)))
       (when (or (> ahead 0) (> behind 0))
         (insert "    "
-                (nerd-icons-codicon "nf-cod-arrow_up") (format " %d  " ahead)
-                (nerd-icons-codicon "nf-cod-arrow_down") (format " %d" behind)
+                (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-arrow_up") (format " %d  " ahead)
+                (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-arrow_down") (format " %d" behind)
                 "\n")))
     (when-let ((commit (plist-get data :last-commit)))
-      (insert "    " (nerd-icons-octicon "nf-oct-git_commit") " "
+      (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-git_commit") " "
               (if (string-match "\\([a-f0-9]+\\) \\(.*\\) (\\(.*\\))" commit)
                   (concat (propertize (match-string 1 commit) 'face 'workbench-dashboard-commit-hash)
                           " " (propertize (match-string 2 commit) 'face 'workbench-dashboard-commit-msg)
@@ -384,7 +380,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
   "Render language breakdown from DATA alist."
   (when data
     (workbench--dashboard-separator)
-    (workbench--dashboard-render-heading (nerd-icons-faicon "nf-fa-code") "Languages")
+    (workbench--dashboard-render-heading (workbench--dashboard-icon 'nerd-icons-faicon "nf-fa-code") "Languages")
     (let ((total (float (apply #'+ (mapcar #'cdr data)))))
       (dolist (pair data)
         (let* ((pct (round (* 100.0 (/ (cdr pair) total))))
@@ -403,7 +399,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
     (cons "justfile" (workbench--dashboard-commands-justfile directory)))
    ((file-exists-p (expand-file-name "Makefile" directory))
     (cons "Makefile" (workbench--dashboard-shell-lines directory
-                       "make" "-pRrq" "--no-print-directory")))))
+                       "sh" "-c" "make -pRrq --no-print-directory 2>/dev/null | awk -F: '/^[a-zA-Z0-9][^$#\\/\\t=]*:([^=]|$)/ {split($1,a,\" \"); print a[1]}'")))))
 
 (defun workbench--dashboard-render-commands (directory)
   "Render available commands for DIRECTORY."
@@ -413,7 +409,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
       (when recipes
         (workbench--dashboard-separator)
         (workbench--dashboard-render-heading
-         (nerd-icons-codicon "nf-cod-terminal")
+         (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-terminal")
          (format "Commands (%s)" runner))
         (insert "    ")
         (let ((names (split-string (string-join recipes " ") " " t))
@@ -429,15 +425,15 @@ Returns alist of (language . count) sorted by count descending, top 5."
   "Render dependencies status from DATA list."
   (when data
     (workbench--dashboard-separator)
-    (workbench--dashboard-render-heading (nerd-icons-codicon "nf-cod-package") "Dependencies")
+    (workbench--dashboard-render-heading (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-package") "Dependencies")
     (dolist (dep data)
       (let ((ready (plist-get dep :ready))
             (tool (plist-get dep :tool))
             (hint (plist-get dep :hint)))
         (insert "    "
                 (if ready
-                    (nerd-icons-octicon "nf-oct-check" :face 'workbench-dashboard-clean)
-                  (nerd-icons-octicon "nf-oct-x" :face 'workbench-dashboard-dirty))
+                    (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-check" :face 'workbench-dashboard-clean)
+                  (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-x" :face 'workbench-dashboard-dirty))
                 " "
                 (propertize tool 'face 'font-lock-type-face)
                 "  "
@@ -450,8 +446,8 @@ Returns alist of (language . count) sorted by count descending, top 5."
   (when data
     (workbench--dashboard-separator)
     (workbench--dashboard-render-heading
-     (nerd-icons-codicon "nf-cod-rocket") (format "CI/CD (%s)" (plist-get data :source)))
-    (insert "    " (nerd-icons-octicon "nf-oct-workflow")
+     (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-rocket") (format "CI/CD (%s)" (plist-get data :source)))
+    (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-workflow")
             " " (propertize (plist-get data :pipeline) 'face 'font-lock-constant-face) "\n")
     (when-let ((steps (plist-get data :steps)))
       (insert "    ")
@@ -463,7 +459,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
           (setq first nil)))
       (insert "\n"))
     (when-let ((trigger (plist-get data :trigger)))
-      (insert "    " (nerd-icons-codicon "nf-cod-zap") " "
+      (insert "    " (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-zap") " "
               (propertize (string-join trigger ", ") 'face 'shadow) "\n"))
     (insert "\n")))
 
@@ -471,10 +467,10 @@ Returns alist of (language . count) sorted by count descending, top 5."
   "Render recent activity from DATA plist."
   (when data
     (workbench--dashboard-separator)
-    (workbench--dashboard-render-heading (nerd-icons-octicon "nf-oct-history") "Recent")
+    (workbench--dashboard-render-heading (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-history") "Recent")
     (when-let ((commits (plist-get data :commits)))
       (dolist (c commits)
-        (insert "    " (nerd-icons-octicon "nf-oct-git_commit") " "
+        (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-git_commit") " "
                 (if (string-match "\\([a-f0-9]+\\) \\(.*\\)" c)
                     (concat (propertize (match-string 1 c) 'face 'workbench-dashboard-commit-hash)
                             " " (match-string 2 c))
@@ -483,7 +479,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
     (when-let ((changed (plist-get data :changed)))
       (insert "\n")
       (dolist (f (seq-take changed 10))
-        (insert "    " (nerd-icons-octicon "nf-oct-diff") " "
+        (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-diff") " "
                 (propertize f 'face 'font-lock-string-face) "\n")))
     (insert "\n")))
 
