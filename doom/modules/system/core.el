@@ -1,6 +1,12 @@
 ;;; system/core.el -*- lexical-binding: t; -*-
 
-(setq user-full-name "Iwan-Dyke")
+;; Error handling convention for workbench modules:
+;; - Interactive commands signal `user-error' (clean message, no debugger).
+;; - Internal functions let errors propagate — don't catch unless you can
+;;   handle meaningfully (Henney).
+;; - `condition-case' only where recovery is possible (e.g. windmove fallback).
+
+(global-auto-revert-mode +1)
 
 (defvar workbench/profile
   (let ((profile (or (getenv "WORKBENCH_PROFILE") "personal")))
@@ -13,7 +19,7 @@
   "Load profile FILE from the workbench profiles directory when it exists."
   (let ((path (expand-file-name file (expand-file-name "profiles" doom-user-dir))))
     (when (file-exists-p path)
-      (load! path))))
+      (load path nil 'nomessage))))
 
 (defvar workbench/default-ai-tool "claude"
   "Default AI tool for the active workbench profile. Overridden by profile files.")
@@ -32,12 +38,3 @@
   (interactive)
   (message "Workbench default AI tool: %s" workbench/default-ai-tool))
 
-(defun workbench/close-frame ()
-  "Close the selected Emacs frame."
-  (interactive)
-  (delete-frame))
-
-(defun workbench/stop-daemon ()
-  "Stop the current Emacs workbench daemon."
-  (interactive)
-  (save-buffers-kill-emacs))

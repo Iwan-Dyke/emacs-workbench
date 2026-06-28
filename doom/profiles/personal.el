@@ -1,3 +1,4 @@
 ;;; profiles/personal.el -*- lexical-binding: t; -*-
 
-(setq workbench/default-ai-tool "codex")
+(setq user-full-name "Iwan Dyke"
+      workbench/default-ai-tool "codex")
