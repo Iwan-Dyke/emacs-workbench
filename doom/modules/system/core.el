@@ -9,7 +9,13 @@
 (global-auto-revert-mode +1)
 
 (defvar workbench/profile
-  (let ((profile (or (getenv "WORKBENCH_PROFILE") "personal")))
+  (let ((profile (or ;; Prefer daemon name — env var is unreliable across macOS daemon restarts
+                     (let ((name (daemonp)))
+                       (when (and (stringp name)
+                                  (string-prefix-p "workbench-" name))
+                         (substring name (length "workbench-"))))
+                     (getenv "WORKBENCH_PROFILE")
+                     "personal")))
     (if (member profile '("personal" "work"))
         profile
       "personal"))
