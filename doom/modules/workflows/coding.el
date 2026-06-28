@@ -18,20 +18,6 @@ appends a numeric suffix (e.g. utils<2>)."
           (setq n (1+ n)))
         candidate))))
 
-(defun workbench/open-project-dashboard (directory)
-  "Open the project dashboard for DIRECTORY."
-  (let* ((project-directory (file-truename directory))
-         (project-name (workbench--directory-name project-directory))
-         (project-identity (workbench--project-identity-name project-directory))
-         (buffer (get-buffer-create (format "*workbench:%s*" project-identity))))
-    (switch-to-buffer buffer)
-    (special-mode)
-    (setq-local default-directory project-directory)
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (insert project-name "\n")
-      (insert (abbreviate-file-name project-directory) "\n"))))
-
 (defun workbench/open-project-workspace (directory)
   "Open DIRECTORY as a workbench project workspace.
 If a workspace with the directory's name already exists, switches to it.
