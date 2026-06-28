@@ -2,6 +2,36 @@
 
 (declare-function treemacs-get-local-window "treemacs-core-utils")
 
+;; ── Theming ─────────────────────────────────────────────────────────────────
+
+(add-to-list 'custom-theme-load-path
+             (expand-file-name "themes/" doom-user-dir))
+
+(defvar workbench/themes
+  '(workbench-wayne-tech workbench-matrix)
+  "List of workbench themes available for switching.")
+
+(defvar workbench/default-theme nil
+  "Default theme for the active profile. Set by profile files.")
+
+(defun workbench/switch-theme ()
+  "Switch between workbench themes interactively."
+  (interactive)
+  (let ((theme (intern (completing-read "Theme: "
+                         (mapcar #'symbol-name workbench/themes)
+                         nil t))))
+    (mapc #'disable-theme custom-enabled-themes)
+    (load-theme theme t)
+    (message "Switched to %s" theme)))
+
+(defun workbench--apply-default-theme ()
+  "Apply the profile default theme if set."
+  (when workbench/default-theme
+    (mapc #'disable-theme custom-enabled-themes)
+    (load-theme workbench/default-theme t)))
+
+;; ── Frame ───────────────────────────────────────────────────────────────────
+
 ;; Open frames maximized so the workbench fills the screen. The
 ;; default-frame-alist entry covers a plain `emacs'; the hook covers
 ;; emacsclient frames created against the workbench daemon, which do not
@@ -109,3 +139,6 @@ all windows; any other key (e.g. ESC) exits."
   (workbench--resize-message)
   (set-transient-map workbench-resize-map t
                      (lambda () (message "Resize done"))))
+
+;; Apply the profile default theme after all modules have loaded.
+(add-hook 'doom-init-ui-hook #'workbench--apply-default-theme)

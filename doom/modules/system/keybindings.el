@@ -7,7 +7,8 @@
        :desc "Show profile" "p" #'workbench/show-profile
        :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool
        :desc "Open startup workspaces" "s" #'workbench/open-startup-workspaces
-       :desc "Resize windows" "r" #'workbench/resize-mode)
+       :desc "Resize windows" "r" #'workbench/resize-mode
+       :desc "Switch theme" "t" #'workbench/switch-theme)
 
       (:prefix-map ("t" . "terminals")
        :desc "New terminal workspace" "t" #'workbench/open-terminal-workspace
