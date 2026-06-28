@@ -11,6 +11,7 @@
 (load! "modules/workflows/project-dashboard")
 (load! "modules/workflows/ai")
 (load! "modules/workflows/session")
+(load! "modules/workflows/command-centre")
 (load! "modules/system/keybindings")
 
 ;; Override: upstream passes `t' to doom-initialize but the current signature
