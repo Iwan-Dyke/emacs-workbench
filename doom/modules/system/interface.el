@@ -1,5 +1,7 @@
 ;;; system/interface.el -*- lexical-binding: t; -*-
 
+(declare-function treemacs-get-local-window "treemacs-core-utils")
+
 ;; Open frames maximized so the workbench fills the screen. The
 ;; default-frame-alist entry covers a plain `emacs'; the hook covers
 ;; emacsclient frames created against the workbench daemon, which do not
