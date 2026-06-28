@@ -58,28 +58,36 @@ From the Treemacs tree, return to the editing window."
   (interactive)
   (if (window-in-direction 'right)
       (shrink-window-horizontally workbench/resize-step)
-    (enlarge-window-horizontally workbench/resize-step)))
+    (enlarge-window-horizontally workbench/resize-step))
+  (workbench--resize-message))
 
 (defun workbench/resize-right ()
   "Move the selected window's vertical divider right by `workbench/resize-step'."
   (interactive)
   (if (window-in-direction 'right)
       (enlarge-window-horizontally workbench/resize-step)
-    (shrink-window-horizontally workbench/resize-step)))
+    (shrink-window-horizontally workbench/resize-step))
+  (workbench--resize-message))
 
 (defun workbench/resize-down ()
   "Move the selected window's horizontal divider down by `workbench/resize-step'."
   (interactive)
   (if (window-in-direction 'below)
       (enlarge-window workbench/resize-step)
-    (shrink-window workbench/resize-step)))
+    (shrink-window workbench/resize-step))
+  (workbench--resize-message))
 
 (defun workbench/resize-up ()
   "Move the selected window's horizontal divider up by `workbench/resize-step'."
   (interactive)
   (if (window-in-direction 'below)
       (shrink-window workbench/resize-step)
-    (enlarge-window workbench/resize-step)))
+    (enlarge-window workbench/resize-step))
+  (workbench--resize-message))
+
+(defun workbench--resize-message ()
+  "Show the resize mode indicator."
+  (message "Resize: h/l width  j/k height  = balance  (any other key exits)"))
 
 (defvar workbench-resize-map
   (let ((map (make-sparse-keymap)))
@@ -87,7 +95,7 @@ From the Treemacs tree, return to the editing window."
     (define-key map "l" #'workbench/resize-right)
     (define-key map "j" #'workbench/resize-down)
     (define-key map "k" #'workbench/resize-up)
-    (define-key map "=" #'balance-windows)
+    (define-key map "=" (lambda () (interactive) (balance-windows) (workbench--resize-message)))
     map)
   "Transient keymap for repeatable window resizing.")
 
@@ -96,6 +104,6 @@ From the Treemacs tree, return to the editing window."
 Tap h/l to adjust width and j/k to adjust height, repeatedly; = balances
 all windows; any other key (e.g. ESC) exits."
   (interactive)
-  (message "Resize: h/l width  j/k height  = balance  (any other key exits)")
+  (workbench--resize-message)
   (set-transient-map workbench-resize-map t
                      (lambda () (message "Resize done"))))

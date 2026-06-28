@@ -20,48 +20,28 @@
        :desc "Open default AI workspace" "a" #'workbench/open-default-ai-workspace
        :desc "Toggle default AI project pane" "p" #'workbench/toggle-project-ai)
 
-      (:prefix-map ("q" . "quit/session")
-       :desc "Close frame" "f" #'workbench/close-frame
-       :desc "Stop daemon" "q" #'workbench/stop-daemon)
-
-      (:prefix-map ("f" . "files")
-       :desc "Find file in project" "f" #'project-find-file
+      (:prefix ("f" . "files")
        :desc "Open file manager (Dirvish)" "m" #'workbench/open-files)
 
-      (:prefix ("c" . "code")
-       :desc "Format buffer/region" "f" #'+format/region-or-buffer)
-
-      (:prefix-map ("g" . "git")
-       :desc "Open Git status" "g" #'workbench/open-git)
-
-      (:prefix-map ("p" . "projects")
-       :desc "Switch project" "p" #'workbench/switch-project
-       :desc "Find project file" "f" #'workbench/find-project-file
-       :desc "Search project" "s" #'workbench/search-project
+      (:prefix ("p" . "projects")
        :desc "Open project workspace" "o" #'workbench/open-project-workspace-dwim))
 
-;; tmux-like window navigation matching the Neovim C-h/j/k/l motions.
-;; This takes C-h from the help prefix; help remains available on SPC h.
 (map! "C-h" #'workbench/window-left
       "C-j" #'evil-window-down
       "C-k" #'evil-window-up
       "C-l" #'workbench/window-right)
 
-;; Popup terminal, mirroring the Neovim toggleterm C-t. Bind in the evil
-;; normal/visual/motion state maps, not just the global map: the workspaces
-;; module binds C-t to +workspace/new in `evil-normal-state-map', which outranks
-;; a plain global binding and was silently spawning a workspace instead. Insert
-;; state is left alone (so C-t still types normally while editing); the terminal
-;; gets its own binding in the vterm block below.
+;; Bind in evil normal/visual/motion state maps: the workspaces module binds
+;; C-t to +workspace/new in `evil-normal-state-map', which outranks a plain
+;; global binding.
 (map! :nvm "C-t" #'workbench/toggle-popup-terminal)
 
-;; Keep window navigation working from inside vterm (e.g. the AI pane),
-;; so the terminal is never a focus trap (ADR 0048).
 (after! vterm
+  (setq vterm-keymap-exceptions
+        (delete-dups (append '("C-t" "C-j" "C-k") vterm-keymap-exceptions)))
   (map! :map vterm-mode-map
         "C-h" #'workbench/window-left
         "C-j" #'evil-window-down
         "C-k" #'evil-window-up
         "C-l" #'workbench/window-right
-        ;; Dismiss the popup from inside it, like toggleterm's terminal-mode C-t.
         "C-t" #'workbench/toggle-popup-terminal))
