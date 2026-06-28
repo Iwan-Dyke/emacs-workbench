@@ -1,5 +1,11 @@
 ;;; tools/files.el -*- lexical-binding: t; -*-
 
+(require 'cl-lib)
+
+(defun workbench--directory-name (directory)
+  "Return a workspace-friendly name for DIRECTORY."
+  (file-name-nondirectory (directory-file-name directory)))
+
 (defun workbench--project-root ()
   "Return the current project root, or `default-directory' when outside a project."
   (or (when-let ((project (project-current nil)))
@@ -60,9 +66,10 @@ Roots at DIRECTORY even when it is not a VCS project (ADR 0043)."
     (treemacs-select-window)
     (unless (treemacs-is-path path :in-workspace)
       (treemacs-do-add-project-to-workspace path name))
-    (dolist (project (treemacs-workspace->projects (treemacs-current-workspace)))
-      (unless (treemacs-is-path path :same-as (treemacs-project->path project))
-        (treemacs-do-remove-project-from-workspace project)))
+    (dolist (project (cl-remove-if
+                      (lambda (p) (treemacs-is-path path :same-as (treemacs-project->path p)))
+                      (treemacs-workspace->projects (treemacs-current-workspace))))
+      (treemacs-do-remove-project-from-workspace project))
     (when-let ((window (workbench--treemacs-window)))
       (select-window window))))
 

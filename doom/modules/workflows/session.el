@@ -1,5 +1,9 @@
 ;;; workflows/session.el -*- lexical-binding: t; -*-
 
+(declare-function workbench/open-files "modules/tools/files")
+(declare-function workbench/open-files-full-frame "modules/tools/files")
+(declare-function workbench/open-default-ai-workspace "modules/workflows/ai")
+
 ;; Session startup: the workspaces a fresh daemon opens, and the persp-mode
 ;; tweaks that keep them stable. Composes the files browser (tools/files) and
 ;; the default AI agent (workflows/ai) into the start-of-day layout (ADR 0042,
@@ -29,9 +33,6 @@ Leaves the original (dashboard) workspace selected."
     (workbench/open-files)
     (workbench/open-default-ai-workspace)
     (+workspace-switch starting-workspace t)
-    ;; Nothing displays the workspace list on its own after we build it in the
-    ;; background, so the new workspaces stay invisible until you switch into
-    ;; one. Show the workspace tabline now so they are visible immediately.
     (+workspace/display)))
 
 (defvar workbench--startup-workspaces-opened nil
@@ -55,16 +56,21 @@ Leaves the original (dashboard) workspace selected."
 (defun workbench--open-startup-workspaces-once (&rest _)
   "Open startup workspaces once after the first usable graphic frame exists.
 Guards on `display-graphic-p' so the daemon's frameless `emacs-startup-hook'
-call is skipped and the setup runs from `server-after-make-frame-hook', once a
-real frame exists and is large enough to hold the workspace layouts."
+call is skipped and the setup runs from `after-focus-change-function', once a
+real frame exists, has focus, and is large enough to hold the workspace layouts."
   (when (and (not workbench--startup-workspaces-opened)
              (not workbench--startup-workspaces-scheduled)
-             (display-graphic-p))
+             (display-graphic-p)
+             (frame-focus-state))
     (setq workbench--startup-workspaces-scheduled t)
-    (run-at-time 0.2 nil #'workbench--try-open-startup-workspaces)))
+    (workbench--try-open-startup-workspaces)
+    ;; Remove ourselves once done — no need to run on every focus change.
+    (remove-function after-focus-change-function
+                     #'workbench--open-startup-workspaces-once)))
 
 (add-hook 'emacs-startup-hook #'workbench--open-startup-workspaces-once)
-(add-hook 'server-after-make-frame-hook #'workbench--open-startup-workspaces-once)
+(add-function :after after-focus-change-function
+              #'workbench--open-startup-workspaces-once)
 
 ;; The files workspace shows full-frame Dirvish (listing + preview). Full-frame
 ;; Dirvish cannot survive persp's window-config save/restore across a workspace

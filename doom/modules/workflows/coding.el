@@ -1,20 +1,30 @@
 ;;; workflows/coding.el -*- lexical-binding: t; -*-
 
-(defun workbench--directory-name (directory)
-  "Return a workspace-friendly name for DIRECTORY."
-  (file-name-nondirectory (directory-file-name directory)))
+(declare-function workbench--directory-name "modules/tools/files")
+(declare-function workbench/open-selected-path-as-project-workspace "modules/tools/files")
 
 (defun workbench--project-identity-name (directory)
-  "Return a stable workspace-friendly identity name for DIRECTORY."
+  "Return a workspace name for DIRECTORY: the bare directory name.
+If a workspace with that name already exists for a different directory,
+appends a numeric suffix (e.g. utils<2>)."
   (let* ((path (directory-file-name (file-truename directory)))
-         (name (file-name-nondirectory path))
-         (parent (file-name-nondirectory
-                  (directory-file-name (file-name-directory path))))
-         (base (if (string-empty-p parent)
-                   name
-                 (format "%s-%s" parent name)))
-         (hash (substring (secure-hash 'sha1 path) 0 6)))
-    (format "%s-%s" base hash)))
+         (base (file-name-nondirectory path)))
+    (if (or (not (fboundp '+workspace-exists-p))
+            (not (+workspace-exists-p base)))
+        base
+      ;; Name taken — check if it's the same directory (reopen) or a collision.
+      (let ((existing-dir
+             (when-let ((buf (get-buffer (format "*workbench:%s*" base))))
+               (buffer-local-value 'default-directory buf))))
+        (if (and existing-dir (string= (file-truename existing-dir) path))
+            base
+          ;; Collision — find next available suffix
+          (let ((n 2) candidate)
+            (while (progn
+                     (setq candidate (format "%s<%d>" base n))
+                     (+workspace-exists-p candidate))
+              (setq n (1+ n)))
+            candidate))))))
 
 (defun workbench/open-project-dashboard (directory)
   "Open the project dashboard for DIRECTORY."
