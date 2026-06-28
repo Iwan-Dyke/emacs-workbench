@@ -40,6 +40,7 @@
   (setq vterm-keymap-exceptions
         (delete-dups (append '("C-t" "C-j" "C-k") vterm-keymap-exceptions)))
   (map! :map vterm-mode-map
+        "C-c C-c" #'vterm-send-C-c
         "C-h" #'workbench/window-left
         "C-j" #'evil-window-down
         "C-k" #'evil-window-up
