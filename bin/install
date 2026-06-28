@@ -14,6 +14,8 @@ wrapper_marker="# Managed by emacs-workbench install"
 
 status=0
 
+# --- Utilities ---
+
 fail() {
     printf "fail %s\n" "$1"
     status=1
@@ -77,6 +79,12 @@ find_doom_bin() {
     fi
 }
 
+# --- Step functions (in execution order) ---
+
+install_platform_tools() {
+    must_run "install platform tools" "$platform_tools_bin"
+}
+
 ensure_doom_checkout() {
     local doom_bin
 
@@ -98,19 +106,6 @@ ensure_doom_checkout() {
 
     must_run "clone Doom Emacs" git clone --depth 1 "$doom_repo" "$HOME/.emacs.d" || return
     ok "doom cloned"
-}
-
-install_doom() {
-    local doom_bin
-
-    doom_bin="$(find_doom_bin)"
-    if [ -z "$doom_bin" ]; then
-        fail "doom command not found; cannot install Doom"
-        return
-    fi
-
-    must_run "install Doom Emacs" "$doom_bin" --doomdir "$doom_source" install --no-config --no-env -! || return
-    ok "doom installed"
 }
 
 check_required_tools() {
@@ -146,9 +141,9 @@ ensure_doom_config_link() {
     local current_target
 
     if [ -L "$doom_target" ]; then
-        current_target="$(readlink "$doom_target")"
+        current_target="$(cd "$(dirname "$doom_target")" && realpath "$(readlink "$doom_target")")"
 
-        if [ "$current_target" = "$doom_source" ]; then
+        if [ "$current_target" = "$(realpath "$doom_source")" ]; then
             ok "$doom_target already links to repo doom config"
         else
             fail "$doom_target links to somewhere else: $current_target"
@@ -162,26 +157,25 @@ ensure_doom_config_link() {
     fi
 }
 
-install_launch_wrapper() {
-    local name="$1"
-    local profile="$2"
-    local target="$user_bin/$name"
+install_doom() {
+    local doom_bin
 
-    mkdir -p "$user_bin"
-
-    if [ -e "$target" ]; then
-        if wrapper_is_managed "$target" "$profile"; then
-            :
-        else
-            fail "$target exists and is not managed by this workbench"
-            return
-        fi
+    doom_bin="$(find_doom_bin)"
+    if [ -z "$doom_bin" ]; then
+        fail "doom command not found; cannot install Doom"
+        return
     fi
 
-    render_wrapper "$profile" >"$target"
+    # Skip if Doom is already installed (the state directory is created by
+    # `doom install` and proves a successful prior run). Re-running install -!
+    # is destructive: it wipes and recreates the local state.
+    if [ -d "$HOME/.emacs.d/.local/state" ]; then
+        ok "doom already installed; skipping (use 'doom install -!' to force)"
+        return
+    fi
 
-    chmod +x "$target"
-    ok "installed $target"
+    must_run "install Doom Emacs" "$doom_bin" --doomdir "$doom_source" install --no-config --no-env -! || return
+    ok "doom installed"
 }
 
 render_wrapper() {
@@ -212,6 +206,28 @@ wrapper_is_managed() {
     [ "$(cat "$target")" = "$expected" ]
 }
 
+install_launch_wrapper() {
+    local name="$1"
+    local profile="$2"
+    local target="$user_bin/$name"
+
+    mkdir -p "$user_bin"
+
+    if [ -e "$target" ]; then
+        if wrapper_is_managed "$target" "$profile"; then
+            :
+        else
+            fail "$target exists and is not managed by this workbench"
+            return
+        fi
+    fi
+
+    render_wrapper "$profile" >"$target"
+
+    chmod +x "$target"
+    ok "installed $target"
+}
+
 install_launch_wrappers() {
     install_launch_wrapper startup personal
     [ "$status" -eq 0 ] || return
@@ -231,14 +247,6 @@ check_user_bin_path() {
         printf "export PATH=\"\$HOME/.local/bin:\$PATH\"\n"
         ;;
     esac
-}
-
-print_next_steps() {
-    printf "Next:\n"
-    printf "  startup\n"
-    printf "  startup-work\n"
-    printf "  workbench restart personal\n"
-    printf "  workbench restart work\n"
 }
 
 run_doom_sync() {
@@ -269,17 +277,23 @@ run_doom_env_if_needed() {
     must_run "generate Doom env" "$doom_bin" sync --env
 }
 
+install_language_tools() {
+    try_run "install language tools" "$language_tools_bin"
+}
+
 run_doctor_report() {
     must_run "run workbench doctor" "$repo_root/bin/doctor"
 }
 
-install_platform_tools() {
-    must_run "install platform tools" "$platform_tools_bin"
+print_next_steps() {
+    printf "Next:\n"
+    printf "  startup\n"
+    printf "  startup-work\n"
+    printf "  workbench restart personal\n"
+    printf "  workbench restart work\n"
 }
 
-install_language_tools() {
-    try_run "install language tools" "$language_tools_bin"
-}
+# --- Execution ---
 
 run_if_ok install_platform_tools
 run_if_ok ensure_doom_checkout

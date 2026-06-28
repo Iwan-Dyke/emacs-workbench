@@ -12,7 +12,11 @@ doctor:
 
 check:
     bash -n ./install.sh ./bin/install ./bin/install.d/platform-tools ./bin/install.d/language-tools ./bin/sync ./bin/doctor ./bin/workbench
+    command -v shellcheck >/dev/null && shellcheck ./install.sh ./bin/install ./bin/install.d/platform-tools ./bin/install.d/language-tools ./bin/sync ./bin/doctor ./bin/workbench || true
     ./bin/doctor
+
+test:
+    emacs --batch --no-init-file -l ert -l test/workbench-test.el -f ert-run-tests-batch-and-exit
 
 workbench profile="personal":
     ./bin/workbench {{profile}}
