@@ -1,6 +1,7 @@
 ;;; workflows/ai.el -*- lexical-binding: t; -*-
 
 (require 'seq)
+(declare-function workbench--project-root "modules/tools/files")
 
 ;; Two AI scopes (ADR 0034). Global/session agents run full-window in the "ai"
 ;; workspace; project AI panes dock on the far right of a coding layout
@@ -50,8 +51,8 @@ If the buffer exists but the process is dead, kills and relaunches it."
 ;; ADR 0034, ADR 0035). Each workspace gets its own AI pane buffer so switching
 ;; workspaces doesn't bleed context between projects.
 
-(defvar workbench-project-ai-width 25
-  "Width of the project AI pane in columns (ADR 0048).")
+(defvar workbench-project-ai-width 0.30
+  "Width of the project AI pane as a fraction of the frame (ADR 0048).")
 
 (defun workbench--project-ai-buffer-name (tool)
   "Return the project AI buffer name for TOOL scoped to the current workspace."
@@ -67,12 +68,14 @@ If the buffer exists but the process is dead, kills and relaunches it."
 
 (defun workbench--show-project-ai (tool)
   "Show TOOL as the far-right AI pane for the current workspace.
-Hides any other project AI pane first so only one is visible (exclusive)."
+Hides any other project AI pane first so only one is visible (exclusive).
+Launches at the project root so the agent sees the whole project."
   (when-let ((other (workbench--project-ai-window)))
     (delete-window other))
   (let* ((buffer-name (workbench--project-ai-buffer-name tool))
          (command (workbench--ai-command tool))
          (existing (get-buffer buffer-name))
+         (default-directory (workbench--project-root))
          (buffer (or existing (get-buffer-create buffer-name)))
          (window (display-buffer
                   buffer
@@ -81,11 +84,25 @@ Hides any other project AI pane first so only one is visible (exclusive)."
                     (window . root)
                     (window-width . ,workbench-project-ai-width)))))
     (select-window window)
-    (unless existing
+    (if existing
+        (workbench--vterm-resize buffer window)
       (with-current-buffer buffer
         (vterm-mode)
+        (workbench--vterm-resize buffer window)
         (vterm-send-string command)
-        (vterm-send-return)))))
+        (vterm-send-return)
+        ;; Resize again after the child process initializes, as some tools
+        ;; query pty dimensions on startup.
+        (let ((buf buffer) (win window))
+          (run-at-time 0.5 nil
+                       (lambda ()
+                         (when (and (buffer-live-p buf) (window-live-p win))
+                           (workbench--vterm-resize buf win))))
+          (run-at-time 2.0 nil
+                       (lambda ()
+                         (when (and (buffer-live-p buf) (window-live-p win))
+                           (workbench--vterm-resize buf win)))))))))
+
 
 (defun workbench--toggle-project-ai (tool)
   "Toggle TOOL as the project AI pane for the current workspace."
@@ -115,3 +132,30 @@ Hides any other project AI pane first so only one is visible (exclusive)."
   "Toggle the profile default AI as the project pane (ADR 0034, ADR 0048)."
   (interactive)
   (workbench--toggle-project-ai workbench/default-ai-tool))
+
+;; Vterm buffers are read-only, so resizing the libvterm grid requires
+;; inhibit-read-only. Without this, vterm--set-size silently fails and the
+;; pty keeps its stale column count.
+(defun workbench--vterm-resize (buffer window)
+  "Resize vterm BUFFER to match WINDOW dimensions."
+  (with-current-buffer buffer
+    (when (and (boundp 'vterm--term) vterm--term)
+      (let ((inhibit-read-only t)
+            (h (window-body-height window))
+            (w (window-body-width window)))
+        (vterm--set-size vterm--term h w)
+        (when-let ((proc (get-buffer-process buffer)))
+          (set-process-window-size proc h w))))))
+
+(defun workbench--sync-vterm-size (&optional frame)
+  "Resize all visible vterm buffers to match their current window."
+  (dolist (window (window-list (or frame (selected-frame))))
+    (let ((buf (window-buffer window)))
+      (when (and (buffer-live-p buf)
+                 (with-current-buffer buf
+                   (and (derived-mode-p 'vterm-mode)
+                        (boundp 'vterm--term)
+                        vterm--term)))
+        (workbench--vterm-resize buf window)))))
+
+(add-hook 'window-size-change-functions #'workbench--sync-vterm-size)
