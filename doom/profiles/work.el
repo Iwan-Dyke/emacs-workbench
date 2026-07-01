@@ -2,4 +2,5 @@
 
 (setq user-full-name "Iwan Dyke"
       workbench/default-ai-tool "kiro"
-      workbench/default-theme 'workbench-wayne-tech)
+      workbench/default-theme 'workbench-wayne-tech
+      workbench/command-centre-view 'team-lead)

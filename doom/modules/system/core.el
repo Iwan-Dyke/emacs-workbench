@@ -30,6 +30,10 @@
 (defvar workbench/default-ai-tool "claude"
   "Default AI tool for the active workbench profile. Overridden by profile files.")
 
+(defvar workbench/command-centre-view 'ic
+  "Which command centre view to render: 'ic (default) or 'team-lead.
+Set in profile files to switch between individual contributor and team lead dashboards.")
+
 (workbench--load-profile-file (concat workbench/profile ".el"))
 (workbench--load-profile-file "local.el")
 (workbench--load-profile-file "secrets.el")

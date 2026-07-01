@@ -8,10 +8,35 @@
 
 ;;; ── Data Collection ────────────────────────────────────────────────────────
 
-(defvar workbench-cc--jira-project "DPT")
-(defvar workbench-cc--jira-user "iwan.dyke@dvla.gov.uk")
-(defvar workbench-cc--code-root "~/code/")
-(defvar workbench-cc--spark-url "http://localhost:8888")
+(defvar workbench-cc--jira-project nil
+  "Jira project key for the command centre. Set in profiles/local.el.")
+(defvar workbench-cc--jira-user nil
+  "Jira username (email) for the command centre. Set in profiles/local.el.")
+(defvar workbench-cc--git-author nil
+  "Git author name fragment for filtering commits. Set in profiles/local.el.")
+(defvar workbench-cc--code-root "~/code/"
+  "Root directory to scan for git repositories.")
+(defvar workbench-cc--spark-url "http://localhost:8888"
+  "URL to health-check the local Spark environment.")
+
+;; Team lead view config (ADR 0063)
+(defvar workbench-cc--team-name nil
+  "Team display name for the team lead view. Set in profiles/local.el.")
+(defvar workbench-cc--team-id nil
+  "Jira team UUID for JQL filtering. Set in profiles/local.el.")
+(defvar workbench-cc--team-wip-limit 2
+  "WIP limit for the team (items In Progress).")
+(defvar workbench-cc--team-members nil
+  "List of team member display names for filtering.
+Set in profiles/local.el as a list of strings.")
+
+;; Team board statuses (may differ from main board statuses)
+(defvar workbench-cc--team-status-next "Next"
+  "Status name for the team's 'next up' column.")
+(defvar workbench-cc--team-status-wip "In Progress"
+  "Status name for the team's active work column.")
+(defvar workbench-cc--team-status-done "Done"
+  "Status name for the team's completed column.")
 
 (defun workbench-cc--shell (dir &rest args)
   "Run ARGS in DIR, return trimmed stdout or nil."
@@ -28,20 +53,21 @@
 
 (defun workbench-cc--jira-tickets ()
   "Fetch In Progress tickets. Returns list of plists."
-  (let ((lines (workbench-cc--shell-lines
-                nil "jira" "issue" "list"
-                "-p" workbench-cc--jira-project
-                "-a" workbench-cc--jira-user
-                "-s" "In Progress"
-                "--plain" "--no-headers"
-                "--columns" "KEY,SUMMARY,TYPE,UPDATED")))
-    (mapcar (lambda (line)
-              (let ((parts (split-string line "\t+" nil)))
-                (list :key (string-trim (or (nth 0 parts) ""))
-                      :summary (string-trim (or (nth 1 parts) ""))
-                      :type (string-trim (or (nth 2 parts) ""))
-                      :updated (string-trim (or (nth 3 parts) "")))))
-            (or lines '()))))
+  (when (and workbench-cc--jira-project workbench-cc--jira-user)
+    (let ((lines (workbench-cc--shell-lines
+                  nil "jira" "issue" "list"
+                  "-p" workbench-cc--jira-project
+                  "-a" workbench-cc--jira-user
+                  "-s" "In Progress"
+                  "--plain" "--no-headers"
+                  "--columns" "KEY,SUMMARY,TYPE,UPDATED")))
+      (mapcar (lambda (line)
+                (let ((parts (split-string line "\t+" nil)))
+                  (list :key (string-trim (or (nth 0 parts) ""))
+                        :summary (string-trim (or (nth 1 parts) ""))
+                        :type (string-trim (or (nth 2 parts) ""))
+                        :updated (string-trim (or (nth 3 parts) "")))))
+              (or lines '())))))
 
 (defun workbench-cc--ticket-last-comment-date (key)
   "Get date of last comment on KEY, or nil."
@@ -88,7 +114,7 @@
                         (mapcar (lambda (d)
                                   (when-let ((date (workbench-cc--shell
                                                     d "git" "log" "-1"
-                                                    "--author=iwan" "--format=%ct")))
+                                                    (concat "--author=" workbench-cc--git-author) "--format=%ct")))
                                     (cons d (string-to-number date))))
                                 git-dirs)))
          (sorted (sort with-commit (lambda (a b) (> (cdr a) (cdr b))))))
@@ -99,8 +125,8 @@
   (let ((branch (workbench-cc--shell dir "git" "branch" "--show-current"))
         (dirty (workbench-cc--shell-lines dir "git" "status" "--porcelain"))
         (ab (workbench-cc--shell dir "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
-        (last-commit (workbench-cc--shell dir "git" "log" "-1" "--author=iwan" "--format=%ar"))
-        (last-msg (workbench-cc--shell dir "git" "log" "-1" "--author=iwan" "--format=%s")))
+        (last-commit (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-cc--git-author) "--format=%ar"))
+        (last-msg (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-cc--git-author) "--format=%s")))
     (let (ahead behind)
       (when (and ab (string-match "\\([0-9]+\\)\t\\([0-9]+\\)" ab))
         (setq ahead (string-to-number (match-string 1 ab))
@@ -120,7 +146,7 @@
     (dolist (dir repos)
       (when-let ((lines (workbench-cc--shell-lines
                          dir "git" "log"
-                         "--author=iwan" "--since=yesterday"
+                         (concat "--author=" workbench-cc--git-author) "--since=yesterday"
                          "--oneline" "--format=%h %s")))
         (dolist (line (seq-take lines 3))
           (push (list :repo (file-name-nondirectory dir) :msg line) commits))))
@@ -141,37 +167,39 @@
 
 (defun workbench-cc--jira-done ()
   "Fetch recently Done tickets (last 5)."
-  (let ((lines (workbench-cc--shell-lines
-                nil "jira" "issue" "list"
-                "-p" workbench-cc--jira-project
-                "-a" workbench-cc--jira-user
-                "-s" "Done"
-                "--plain" "--no-headers"
-                "--columns" "KEY,SUMMARY")))
-    (seq-take
-     (mapcar (lambda (line)
-               (let ((parts (split-string line "\t+" nil)))
-                 (list :key (string-trim (or (nth 0 parts) ""))
-                       :summary (string-trim (or (nth 1 parts) "")))))
-             (or lines '()))
-     3)))
+  (when (and workbench-cc--jira-project workbench-cc--jira-user)
+    (let ((lines (workbench-cc--shell-lines
+                  nil "jira" "issue" "list"
+                  "-p" workbench-cc--jira-project
+                  "-a" workbench-cc--jira-user
+                  "-s" "Done"
+                  "--plain" "--no-headers"
+                  "--columns" "KEY,SUMMARY")))
+      (seq-take
+       (mapcar (lambda (line)
+                 (let ((parts (split-string line "\t+" nil)))
+                   (list :key (string-trim (or (nth 0 parts) ""))
+                         :summary (string-trim (or (nth 1 parts) "")))))
+               (or lines '()))
+       3))))
 
 (defun workbench-cc--jira-next ()
   "Fetch Next queue tickets (top 3)."
-  (let ((lines (workbench-cc--shell-lines
-                nil "jira" "issue" "list"
-                "-p" workbench-cc--jira-project
-                "-s" "Next"
-                "--plain" "--no-headers"
-                "--columns" "KEY,SUMMARY,TYPE")))
-    (seq-take
-     (mapcar (lambda (line)
-               (let ((parts (split-string line "\t+" nil)))
-                 (list :key (string-trim (or (nth 0 parts) ""))
-                       :summary (string-trim (or (nth 1 parts) ""))
-                       :type (string-trim (or (nth 2 parts) "")))))
-             (or lines '()))
-     3)))
+  (when workbench-cc--jira-project
+    (let ((lines (workbench-cc--shell-lines
+                  nil "jira" "issue" "list"
+                  "-p" workbench-cc--jira-project
+                  "-s" "Next"
+                  "--plain" "--no-headers"
+                  "--columns" "KEY,SUMMARY,TYPE")))
+      (seq-take
+       (mapcar (lambda (line)
+                 (let ((parts (split-string line "\t+" nil)))
+                   (list :key (string-trim (or (nth 0 parts) ""))
+                         :summary (string-trim (or (nth 1 parts) ""))
+                         :type (string-trim (or (nth 2 parts) "")))))
+               (or lines '()))
+       3))))
 
 (defun workbench-cc--recent-commits ()
   "Get last 5 commits across all repos from the past 3 days, most recent first."
@@ -180,7 +208,7 @@
     (dolist (dir dirs)
       (when-let ((lines (workbench-cc--shell-lines
                          dir "git" "log" "-5"
-                         "--author=iwan" "--since=3 days ago"
+                         (concat "--author=" workbench-cc--git-author) "--since=3 days ago"
                          "--format=%ct|%ar|%s")))
         (dolist (line lines)
           (let ((parts (split-string line "|" nil)))
@@ -313,7 +341,8 @@
                            ((< hour 17) "Good afternoon")
                            (t "Good evening"))))
       (svg-rectangle svg 0 0 w bar-h :fill (workbench-cc--lighten bg 0.05))
-      (svg-text svg (format "%s, Iwan" greeting)
+      (svg-text svg (format "%s, %s" greeting
+                                    (car (split-string (or user-full-name "User"))))
                 :x pad :y (funcall s 28) :font-size font-lg :font-weight "bold"
                 :fill fg :font-family "monospace")
       (svg-text svg (plist-get data :time)
@@ -581,16 +610,373 @@
         (goto-char (point-min))))
     buf))
 
+;;; ── Team Lead Data Collection ───────────────────────────────────────────────
+
+(defun workbench-cc--team-tickets-by-status (status)
+  "Fetch team tickets in STATUS via JQL. Returns list of plists."
+  (when (and workbench-cc--jira-project workbench-cc--team-id)
+    (let* ((jql (format "project = %s AND team = \"%s\" AND status = \"%s\""
+                        workbench-cc--jira-project workbench-cc--team-id status))
+           (lines (workbench-cc--shell-lines
+                   nil "jira" "issue" "list"
+                   "--jql" jql
+                   "--plain" "--no-headers"
+                   "--columns" "KEY,SUMMARY,ASSIGNEE,UPDATED")))
+      (mapcar (lambda (line)
+                (let ((parts (split-string line "\t+" nil)))
+                  (list :key (string-trim (or (nth 0 parts) ""))
+                        :summary (string-trim (or (nth 1 parts) ""))
+                        :assignee (string-trim (or (nth 2 parts) ""))
+                        :updated (string-trim (or (nth 3 parts) "")))))
+              (or lines '())))))
+
+(defun workbench-cc--team-ticket-last-comment (key)
+  "Get last comment snippet and author for KEY."
+  (when-let ((output (workbench-cc--shell
+                      nil "jira" "issue" "view" key "--comments" "1" "--plain")))
+    (let ((author nil) (snippet nil))
+      (when (string-match "\\([A-Za-z ]+\\) •.*• Latest comment" output)
+        (setq author (string-trim (match-string 1 output))))
+      (when (string-match "Latest comment[^\n]*\n\\(?:\\s-*\n\\)*\\s-*\\(.+\\)" output)
+        (setq snippet (string-trim (match-string 1 output))))
+      (list :author author :snippet snippet))))
+
+(defun workbench-cc--team-attention-items (tickets)
+  "Compute attention items from TICKETS (In Progress list).
+Returns items sorted by urgency: stale first, then no-recent-comment."
+  (let ((items nil))
+    (dolist (tkt tickets)
+      (let* ((days (workbench-cc--days-since-update (plist-get tkt :updated)))
+             (key (plist-get tkt :key))
+             (assignee (plist-get tkt :assignee)))
+        (cond
+         ((and days (> days 14))
+          (push (list :key key :assignee assignee :days days
+                      :reason "two-week rule") items))
+         ((and days (> days 7))
+          (push (list :key key :assignee assignee :days days
+                      :reason "no update 7+ days") items))
+         ((and days (> days 3))
+          (push (list :key key :assignee assignee :days days
+                      :reason "may need check-in") items)))))
+    (sort items (lambda (a b)
+                  (> (or (plist-get a :days) 0)
+                     (or (plist-get b :days) 0))))))
+
+(defun workbench-cc--collect-team-lead ()
+  "Collect all data for the team lead command centre view."
+  (let* ((wip-raw (workbench-cc--team-tickets-by-status workbench-cc--team-status-wip))
+         (wip (mapcar (lambda (tkt)
+                        (let* ((key (plist-get tkt :key))
+                               (comment (workbench-cc--team-ticket-last-comment key)))
+                          (append tkt
+                                  (list :comment-author (plist-get comment :author)
+                                        :comment-snippet (plist-get comment :snippet)))))
+                      wip-raw))
+         (next (workbench-cc--team-tickets-by-status workbench-cc--team-status-next))
+         (done (seq-take (workbench-cc--team-tickets-by-status workbench-cc--team-status-done) 5))
+         (attention (workbench-cc--team-attention-items wip)))
+    (list :wip wip
+          :next next
+          :done done
+          :attention attention
+          :infra (workbench-cc--infra-status)
+          :time (format-time-string "%A %d %B, %H:%M"))))
+
+;;; ── Team Lead Text Renderer ────────────────────────────────────────────────
+
+(defun workbench-cc--icon (fn name &optional face)
+  "Call nerd-icons FN with NAME, applying FACE. Returns empty string if unavailable."
+  (if (fboundp fn)
+      (let ((icon (funcall fn name)))
+        (if face (propertize icon 'face face) icon))
+    ""))
+
+(defun workbench-cc--tl-separator ()
+  "Insert a visual separator line."
+  (insert "  " (propertize "────────────────────────────────────────────────────────\n" 'face 'shadow)))
+
+(defun workbench-cc--infra-pip (label up)
+  "Return a status pip string for LABEL with UP state."
+  (concat (propertize "●" 'face (if up 'success 'error))
+          " "
+          (propertize label 'face (if up 'default 'shadow))))
+
+(defun workbench-cc--open-ticket-at-point ()
+  "Open the Jira ticket at point in a browser."
+  (interactive)
+  (when-let ((key (get-text-property (point) 'workbench-cc-ticket-key)))
+    (start-process "jira-open" nil "jira" "open" key)
+    (message "Opening %s..." key)))
+
+(defun workbench-cc--render-team-lead (data)
+  "Render DATA as a rich text dashboard in the command centre buffer."
+  (let* ((buf (get-buffer-create workbench-cc--buffer-name))
+         (wip-tickets (plist-get data :wip))
+         (next-tickets (plist-get data :next))
+         (done-tickets (plist-get data :done))
+         (attention (plist-get data :attention))
+         (infra (plist-get data :infra))
+         (wip-count (length wip-tickets))
+         (wip-limit workbench-cc--team-wip-limit)
+         (team-label (or workbench-cc--team-name "Team")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+
+        ;; ── Header ──
+        (let* ((hour (string-to-number (format-time-string "%H")))
+               (greeting (cond ((< hour 12) "Good morning")
+                               ((< hour 17) "Good afternoon")
+                               (t "Good evening")))
+               (name (car (split-string (or user-full-name "User")))))
+          (insert "\n")
+          (insert "  "
+                  (workbench-cc--icon 'nerd-icons-mdicon "nf-md-view_dashboard" 'font-lock-keyword-face)
+                  " "
+                  (propertize (format "%s, %s" greeting name) 'face '(:weight bold :height 1.3))
+                  "\n")
+          (insert "  "
+                  (propertize (format "Team Lead · %s" team-label) 'face 'shadow)
+                  "    "
+                  (propertize (plist-get data :time) 'face 'shadow)
+                  "\n\n"))
+
+        ;; ── WIP Gauge ──
+        (let* ((gauge-width 20)
+               (filled (min gauge-width (round (* gauge-width (/ (float wip-count) (max 1 wip-limit))))))
+               (empty (max 0 (- gauge-width filled)))
+               (gauge-face (cond ((>= wip-count (+ wip-limit 2)) 'error)
+                                 ((>= wip-count wip-limit) 'warning)
+                                 (t 'success))))
+          (insert "  "
+                  (workbench-cc--icon 'nerd-icons-mdicon "nf-md-gauge" gauge-face)
+                  " WIP "
+                  (propertize (format "%d" wip-count) 'face `(:inherit ,gauge-face :weight bold))
+                  (propertize (format "/%d " wip-limit) 'face 'shadow)
+                  (propertize (make-string filled ?█) 'face gauge-face)
+                  (propertize (make-string empty ?░) 'face 'shadow))
+          (when (> wip-count wip-limit)
+            (insert " " (propertize "⚠ OVER LIMIT" 'face 'error)))
+          (insert "\n\n"))
+
+        ;; ── Separator ──
+        (workbench-cc--tl-separator)
+
+        ;; ── IN PROGRESS ──
+        (insert "  "
+                (workbench-cc--icon 'nerd-icons-mdicon "nf-md-lightning_bolt" 'font-lock-keyword-face)
+                " "
+                (propertize (format "IN PROGRESS (%d)" wip-count) 'face '(:weight bold :height 1.1))
+                "\n\n")
+        (if (null wip-tickets)
+            (insert "    " (propertize "(empty)" 'face 'shadow) "\n")
+          (dolist (tkt wip-tickets)
+            (let* ((key (plist-get tkt :key))
+                   (summary (plist-get tkt :summary))
+                   (assignee (plist-get tkt :assignee))
+                   (days (workbench-cc--days-since-update (plist-get tkt :updated)))
+                   (comment (plist-get tkt :comment-snippet))
+                   (stale (and days (> days 3)))
+                   (very-stale (and days (> days 7)))
+                   (status-face (cond (very-stale 'error) (stale 'warning) (t 'success))))
+              ;; Line 1: status pip + key + summary
+              (insert "  "
+                      (propertize "●" 'face status-face)
+                      " "
+                      (workbench-cc--icon 'nerd-icons-mdicon "nf-md-ticket_outline" status-face)
+                      " "
+                      (propertize key 'face 'font-lock-constant-face
+                                  'workbench-cc-ticket-key key
+                                  'mouse-face 'highlight)
+                      "  "
+                      (propertize (or summary "") 'face 'default)
+                      "\n")
+              ;; Line 2: assignee + days
+              (insert "    "
+                      (workbench-cc--icon 'nerd-icons-octicon "nf-oct-person" 'shadow)
+                      " "
+                      (propertize (or assignee "") 'face 'shadow)
+                      "  ")
+              (when days
+                (insert (workbench-cc--icon 'nerd-icons-octicon "nf-oct-clock" 'shadow)
+                        " "
+                        (propertize (format "%.0fd" days) 'face status-face)))
+              (insert "\n")
+              ;; Line 3: last comment
+              (if comment
+                  (insert "    "
+                          (workbench-cc--icon 'nerd-icons-octicon "nf-oct-comment" 'shadow)
+                          " "
+                          (propertize (truncate-string-to-width comment 80) 'face 'shadow)
+                          "\n")
+                (insert "    "
+                        (workbench-cc--icon 'nerd-icons-octicon "nf-oct-comment" 'shadow)
+                        " "
+                        (propertize "no comment" 'face '(:inherit shadow :slant italic))
+                        "\n"))
+              (insert "\n"))))
+
+        ;; ── Separator ──
+        (workbench-cc--tl-separator)
+
+        ;; ── NEXT ──
+        (insert "  "
+                (workbench-cc--icon 'nerd-icons-mdicon "nf-md-target" 'font-lock-keyword-face)
+                " "
+                (propertize (format "NEXT (%d)" (length next-tickets)) 'face '(:weight bold :height 1.1))
+                "\n\n")
+        (if (null next-tickets)
+            (insert "    " (propertize "(empty)" 'face 'shadow) "\n")
+          (dolist (tkt next-tickets)
+            (let ((key (plist-get tkt :key))
+                  (summary (plist-get tkt :summary))
+                  (assignee (plist-get tkt :assignee)))
+              (insert "  "
+                      (propertize "○" 'face 'shadow)
+                      " "
+                      (workbench-cc--icon 'nerd-icons-mdicon "nf-md-ticket_outline" 'shadow)
+                      " "
+                      (propertize key 'face 'font-lock-constant-face
+                                  'workbench-cc-ticket-key key
+                                  'mouse-face 'highlight)
+                      "  "
+                      (propertize (or summary "") 'face 'default)
+                      "  "
+                      (workbench-cc--icon 'nerd-icons-octicon "nf-oct-person" 'shadow)
+                      " "
+                      (propertize (or assignee "") 'face 'shadow)
+                      "\n"))))
+        (insert "\n")
+
+        ;; ── Separator ──
+        (workbench-cc--tl-separator)
+
+        ;; ── DONE ──
+        (insert "  "
+                (workbench-cc--icon 'nerd-icons-mdicon "nf-md-trophy" 'success)
+                " "
+                (propertize (format "DONE (%d)" (length done-tickets)) 'face '(:weight bold :height 1.1))
+                "\n\n")
+        (if (null done-tickets)
+            (insert "    " (propertize "(empty)" 'face 'shadow) "\n")
+          (dolist (tkt done-tickets)
+            (let ((key (plist-get tkt :key))
+                  (summary (plist-get tkt :summary)))
+              (insert "  "
+                      (propertize "✓" 'face 'success)
+                      " "
+                      (workbench-cc--icon 'nerd-icons-mdicon "nf-md-rocket_launch" 'success)
+                      " "
+                      (propertize key 'face '(:inherit success :weight bold)
+                                  'workbench-cc-ticket-key key
+                                  'mouse-face 'highlight)
+                      "  "
+                      (propertize (or summary "") 'face 'shadow)
+                      "\n"))))
+        (insert "\n")
+
+        ;; ── Separator ──
+        (workbench-cc--tl-separator)
+
+        ;; ── ATTENTION ──
+        (insert "  "
+                (workbench-cc--icon 'nerd-icons-mdicon "nf-md-alert" (if attention 'warning 'success))
+                " "
+                (propertize (format "ATTENTION (%d)" (length attention))
+                            'face `(:weight bold :height 1.1
+                                    :foreground ,(face-foreground (if attention 'warning 'success) nil t)))
+                "\n\n")
+        (if (null attention)
+            (insert "    "
+                    (workbench-cc--icon 'nerd-icons-octicon "nf-oct-check" 'success)
+                    " "
+                    (propertize "No items need attention" 'face 'success)
+                    "\n")
+          (dolist (item attention)
+            (let* ((days (plist-get item :days))
+                   (face (cond ((> days 14) 'error) ((> days 7) 'warning) (t 'shadow)))
+                   (icon (cond ((> days 14) (workbench-cc--icon 'nerd-icons-mdicon "nf-md-fire" 'error))
+                               ((> days 7) (workbench-cc--icon 'nerd-icons-mdicon "nf-md-alert" 'warning))
+                               (t (workbench-cc--icon 'nerd-icons-mdicon "nf-md-eye" 'shadow)))))
+              (insert "  "
+                      icon
+                      " "
+                      (propertize (plist-get item :key) 'face `(:inherit ,face :weight bold)
+                                  'workbench-cc-ticket-key (plist-get item :key)
+                                  'mouse-face 'highlight)
+                      "  "
+                      (workbench-cc--icon 'nerd-icons-octicon "nf-oct-person" face)
+                      " "
+                      (propertize (or (plist-get item :assignee) "") 'face 'default)
+                      "  "
+                      (workbench-cc--icon 'nerd-icons-octicon "nf-oct-clock" face)
+                      " "
+                      (propertize (format "%.0f days" days) 'face face)
+                      "  "
+                      (propertize (or (plist-get item :reason) "") 'face 'shadow)
+                      "\n"))))
+        (insert "\n")
+
+        ;; ── Separator ──
+        (workbench-cc--tl-separator)
+
+        ;; ── INFRA ──
+        (let ((containers (plist-get infra :containers)))
+          (insert "  "
+                  (workbench-cc--icon 'nerd-icons-mdicon "nf-md-server" 'shadow)
+                  " "
+                  (propertize "INFRA" 'face '(:weight bold))
+                  "   "
+                  (workbench-cc--infra-pip "Colima" (plist-get infra :colima))
+                  "   "
+                  (workbench-cc--infra-pip "Docker" (> (length containers) 0))
+                  (if (> (length containers) 0)
+                      (propertize (format " (%d)" (length containers)) 'face 'shadow) "")
+                  "   "
+                  (workbench-cc--infra-pip "Spark" (plist-get infra :spark))
+                  "\n\n"))
+
+        ;; ── Footer ──
+        (insert "  "
+                (propertize "[r]" 'face 'font-lock-keyword-face) "edraw  "
+                (propertize "[R]" 'face 'font-lock-keyword-face) "efetch  "
+                (propertize "[RET]" 'face 'font-lock-keyword-face) " open ticket  "
+                (propertize "[q]" 'face 'font-lock-keyword-face) "uit"
+                "\n")
+
+        (goto-char (point-min))))
+    buf))
+
 ;;; ── Lifecycle ──────────────────────────────────────────────────────────────
 
 (defvar workbench-cc--timer nil "Auto-refresh timer.")
 (defvar workbench-cc--data nil "Cached dashboard data.")
 
+(defun workbench-cc--render-current ()
+  "Render the current cached data without refetching."
+  (when workbench-cc--data
+    (pcase workbench/command-centre-view
+      ('team-lead (workbench-cc--render-team-lead workbench-cc--data))
+      (_ (workbench-cc--render workbench-cc--data)))))
+
 (defun workbench-cc-refresh ()
-  "Refresh the command centre dashboard."
+  "Refetch data and refresh the command centre dashboard."
   (interactive)
-  (setq workbench-cc--data (workbench-cc--collect-all))
-  (workbench-cc--render workbench-cc--data))
+  (message "Command centre: fetching data...")
+  (setq workbench-cc--data
+        (pcase workbench/command-centre-view
+          ('team-lead (workbench-cc--collect-team-lead))
+          (_ (workbench-cc--collect-all))))
+  (workbench-cc--render-current)
+  (message "Command centre: refreshed"))
+
+(defun workbench-cc-redraw ()
+  "Redraw the command centre from cached data (instant)."
+  (interactive)
+  (if workbench-cc--data
+      (workbench-cc--render-current)
+    (workbench-cc-refresh)))
 
 (defun workbench-cc--maybe-refresh (&rest _)
   "Refresh if the command centre buffer is visible."
@@ -599,18 +985,23 @@
 
 (defvar workbench-cc-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "r" #'workbench-cc-refresh)
+    (define-key map "r" #'workbench-cc-redraw)
+    (define-key map "R" #'workbench-cc-refresh)
+    (define-key map (kbd "RET") #'workbench-cc--open-ticket-at-point)
     (define-key map "q" #'quit-window)
     map))
 
 (define-derived-mode workbench-cc-mode special-mode "CommandCentre"
   "Mode for the workbench command centre."
   (setq-local cursor-type nil)
+  (setq-local truncate-lines t)
   (setq-local buffer-read-only t))
 
 (after! evil
   (evil-define-key 'normal workbench-cc-mode-map
-    "r" #'workbench-cc-refresh
+    "r" #'workbench-cc-redraw
+    "R" #'workbench-cc-refresh
+    (kbd "RET") #'workbench-cc--open-ticket-at-point
     "q" #'quit-window))
 
 (defun workbench-cc-open ()
@@ -624,17 +1015,17 @@
             (run-at-time 300 300 #'workbench-cc--maybe-refresh)))))
 
 (defun workbench-cc--startup ()
-  "Show command centre on startup (work profile only)."
+  "Show command centre on startup (work profile only).
+Suppresses Doom's dashboard immediately but defers SVG rendering to the first
+graphic frame, since `face-attribute' returns `unspecified' in a headless daemon."
   (when (string= workbench/profile "work")
-    ;; Suppress Doom's dashboard
     (setq +doom-dashboard-functions nil)
-    ;; Create the buffer now (data fetch happens here)
-    (workbench-cc-refresh)
-    ;; Show command centre when a frame connects
     (add-hook 'server-after-make-frame-hook #'workbench-cc--show-on-frame)))
 
 (defun workbench-cc--show-on-frame ()
-  "Switch the new frame to the command centre buffer."
+  "Render and show the command centre in the new frame."
+  (remove-hook 'server-after-make-frame-hook #'workbench-cc--show-on-frame)
+  (workbench-cc-refresh)
   (when-let ((buf (get-buffer workbench-cc--buffer-name)))
     (switch-to-buffer buf)
     (workbench-cc-mode)))
@@ -644,8 +1035,9 @@
 
 ;; Redraw on window resize
 (defun workbench-cc--on-resize (&optional _frame)
-  "Redraw if command centre is visible."
+  "Redraw if command centre is visible. Only needed for SVG (IC) view."
   (when (and workbench-cc--data
+             (eq workbench/command-centre-view 'ic)
              (get-buffer-window workbench-cc--buffer-name))
     (workbench-cc--render workbench-cc--data)))
 
