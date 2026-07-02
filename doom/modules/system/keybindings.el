@@ -21,6 +21,9 @@
        :desc "Open default AI workspace" "a" #'workbench/open-default-ai-workspace
        :desc "Toggle default AI project pane" "p" #'workbench/toggle-project-ai)
 
+      (:prefix ("g" . "git")
+       :desc "Toggle popup magit" "g" #'workbench/toggle-popup-magit)
+
       (:prefix ("f" . "files")
        :desc "Open file manager (Dirvish)" "m" #'workbench/open-files)
 
@@ -32,9 +35,14 @@
       "C-k" #'evil-window-up
       "C-l" #'workbench/window-right)
 
-;; Bind in evil normal/visual/motion state maps: the workspaces module binds
-;; C-t to +workspace/new in `evil-normal-state-map', which outranks a plain
-;; global binding.
+;; Doom's workspaces module binds C-t to +workspace/new in
+;; `evil-normal-state-map'. That binding can re-assert after our module loads
+;; (workspace state reinitialisation on later frame/persp events), so unbind
+;; it explicitly after the module is present, then set ours.
+(after! persp-mode
+  (define-key evil-normal-state-map (kbd "C-t") nil)
+  (define-key evil-visual-state-map (kbd "C-t") nil)
+  (define-key evil-motion-state-map (kbd "C-t") nil))
 (map! :nvm "C-t" #'workbench/toggle-popup-terminal)
 
 (after! vterm
