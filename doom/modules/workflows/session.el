@@ -83,10 +83,21 @@ Excludes Dirvish's parent and preview panes, which are also `dired-mode'."
          (and (not (string-prefix-p " " name))
               (not (string-match-p "\\*dirvish-" name))))))
 
+(defvar workbench--files-track-timer nil
+  "Idle timer for debouncing files workspace position tracking.")
+
 (defun workbench--files-track-point ()
-  "Record the files workspace's current directory and file at point.
-Runs from a buffer-local `post-command-hook' in Dired buffers, so the position
-is captured as you browse and survives Dirvish collapsing its layout later."
+  "Schedule position tracking after idle.
+Runs from `post-command-hook' in Dired buffers but defers the actual work
+to an idle timer so rapid j/k navigation doesn't do redundant work."
+  (when workbench--files-track-timer
+    (cancel-timer workbench--files-track-timer))
+  (setq workbench--files-track-timer
+        (run-with-idle-timer 0.15 nil #'workbench--files-track-point-now)))
+
+(defun workbench--files-track-point-now ()
+  "Record the files workspace's current directory and file at point."
+  (setq workbench--files-track-timer nil)
   (when (and (fboundp '+workspace-current-name)
              (equal (+workspace-current-name) "files")
              (workbench--files-real-dired-p))
@@ -95,7 +106,14 @@ is captured as you browse and survives Dirvish collapsing its layout later."
 
 (defun workbench--files-install-tracker ()
   "Install the files-workspace position tracker in this Dired buffer."
-  (add-hook 'post-command-hook #'workbench--files-track-point nil t))
+  (add-hook 'post-command-hook #'workbench--files-track-point nil t)
+  (add-hook 'kill-buffer-hook #'workbench--files-cancel-tracker nil t))
+
+(defun workbench--files-cancel-tracker ()
+  "Cancel any pending files position tracking timer."
+  (when workbench--files-track-timer
+    (cancel-timer workbench--files-track-timer)
+    (setq workbench--files-track-timer nil)))
 
 (defun workbench--files-dirvish-layout-active-p ()
   "Return non-nil when the current buffer has an active Dirvish layout."
