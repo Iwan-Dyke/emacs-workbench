@@ -1,6 +1,7 @@
 ;;; tools/files.el -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
+(declare-function workbench--treemacs-window "modules/system/interface")
 
 (defun workbench--directory-name (directory)
   "Return a workspace-friendly name for DIRECTORY."
