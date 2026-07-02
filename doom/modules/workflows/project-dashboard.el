@@ -557,10 +557,33 @@ Returns alist of (language . count) sorted by count descending, top 5."
      (t (user-error "No README found")))))
 
 (defun workbench/refresh-project-dashboard ()
-  "Refresh the current project dashboard."
+  "Refresh the current project dashboard (re-collects all data)."
   (interactive)
   (when (bound-and-true-p workbench--dashboard-directory)
+    (workbench--dashboard-cache-invalidate workbench--dashboard-directory)
     (workbench/open-project-dashboard workbench--dashboard-directory)))
+
+(defvar workbench--dashboard-cache (make-hash-table :test 'equal)
+  "Cache of collected dashboard data, keyed by truename directory.")
+
+(defun workbench--dashboard-cache-invalidate (directory)
+  "Remove cached data for DIRECTORY."
+  (remhash (file-truename directory) workbench--dashboard-cache))
+
+(defun workbench--dashboard-collect (directory)
+  "Collect all dashboard data for DIRECTORY. Returns plist.
+Uses cache if available; call `workbench--dashboard-cache-invalidate' to force
+re-collection."
+  (let ((key (file-truename directory)))
+    (or (gethash key workbench--dashboard-cache)
+        (let ((data (list :overview (workbench--dashboard-overview directory)
+                          :git (workbench--dashboard-git directory)
+                          :languages (workbench--dashboard-languages directory)
+                          :deps (workbench--dashboard-dependencies directory)
+                          :cicd (workbench--dashboard-cicd directory)
+                          :recent (workbench--dashboard-recent directory))))
+          (puthash key data workbench--dashboard-cache)
+          data))))
 
 (defun workbench--dashboard-render-section (fn &rest args)
   "Call FN with ARGS, catching and reporting errors inline."
@@ -575,12 +598,13 @@ Returns alist of (language . count) sorted by count descending, top 5."
   (let* ((project-directory (file-truename directory))
          (project-identity (workbench--project-identity-name project-directory))
          (buffer (get-buffer-create (format "*workbench:%s*" project-identity)))
-         (overview (workbench--dashboard-overview project-directory))
-         (git (workbench--dashboard-git project-directory))
-         (languages (workbench--dashboard-languages project-directory))
-         (deps (workbench--dashboard-dependencies project-directory))
-         (cicd (workbench--dashboard-cicd project-directory))
-         (recent (workbench--dashboard-recent project-directory)))
+         (data (workbench--dashboard-collect project-directory))
+         (overview (plist-get data :overview))
+         (git (plist-get data :git))
+         (languages (plist-get data :languages))
+         (deps (plist-get data :deps))
+         (cicd (plist-get data :cicd))
+         (recent (plist-get data :recent)))
     (switch-to-buffer buffer)
     (let ((inhibit-read-only t))
       (erase-buffer)
