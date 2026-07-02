@@ -38,39 +38,27 @@ Leaves the original (dashboard) workspace selected."
 (defvar workbench--startup-workspaces-opened nil
   "Whether startup workspaces have been opened for this Emacs process.")
 
-(defvar workbench--startup-workspaces-scheduled nil
-  "Whether startup workspaces are already scheduled to open.")
-
-(defun workbench--try-open-startup-workspaces ()
-  "Open startup workspaces and mark them opened only after success."
-  (condition-case err
-      (progn
-        (workbench/open-startup-workspaces)
-        (setq workbench--startup-workspaces-opened t
-              workbench--startup-workspaces-scheduled nil))
-    (error
-     (setq workbench--startup-workspaces-scheduled nil)
-     (message "Workbench startup workspaces failed: %s"
-              (error-message-string err)))))
-
-(defun workbench--open-startup-workspaces-once (&rest _)
-  "Open startup workspaces once after the first usable graphic frame exists.
-Guards on `display-graphic-p' so the daemon's frameless `emacs-startup-hook'
-call is skipped and the setup runs from `after-focus-change-function', once a
-real frame exists, has focus, and is large enough to hold the workspace layouts."
+(defun workbench--open-startup-workspaces-on-frame (&rest _)
+  "Open startup workspaces once persp-mode is active and a graphic frame exists."
   (when (and (not workbench--startup-workspaces-opened)
-             (not workbench--startup-workspaces-scheduled)
-             (display-graphic-p)
-             (frame-focus-state))
-    (setq workbench--startup-workspaces-scheduled t)
-    (workbench--try-open-startup-workspaces)
-    ;; Remove ourselves once done — no need to run on every focus change.
-    (remove-function after-focus-change-function
-                     #'workbench--open-startup-workspaces-once)))
+             (display-graphic-p))
+    (condition-case err
+        (progn
+          (workbench/open-startup-workspaces)
+          (setq workbench--startup-workspaces-opened t))
+      (error
+       (message "Workbench startup workspaces failed: %s"
+                (error-message-string err))))))
 
-(add-hook 'emacs-startup-hook #'workbench--open-startup-workspaces-once)
-(add-function :after after-focus-change-function
-              #'workbench--open-startup-workspaces-once)
+(add-hook! 'persp-mode-hook
+  (defun workbench--startup-workspaces-after-persp ()
+    "Open startup workspaces after persp-mode initialises."
+    (when (and persp-mode (not workbench--startup-workspaces-opened))
+      (if (display-graphic-p)
+          (workbench--open-startup-workspaces-on-frame)
+        ;; Daemon started headless — wait for first frame.
+        (add-hook 'server-after-make-frame-hook
+                  #'workbench--open-startup-workspaces-on-frame)))))
 
 ;; The files workspace shows full-frame Dirvish (listing + preview). Full-frame
 ;; Dirvish cannot survive persp's window-config save/restore across a workspace
