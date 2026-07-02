@@ -91,14 +91,11 @@ Launches at the project root so the agent sees the whole project."
         (workbench--vterm-resize buffer window)
         (vterm-send-string command)
         (vterm-send-return)
-        ;; Resize again after the child process initializes, as some tools
-        ;; query pty dimensions on startup.
+        ;; The child process queries pty dimensions on startup. The initial
+        ;; resize above happens before the process reads them, so re-send
+        ;; the size once the process has had time to initialize.
         (let ((buf buffer) (win window))
-          (run-at-time 0.5 nil
-                       (lambda ()
-                         (when (and (buffer-live-p buf) (window-live-p win))
-                           (workbench--vterm-resize buf win))))
-          (run-at-time 2.0 nil
+          (run-at-time 1.0 nil
                        (lambda ()
                          (when (and (buffer-live-p buf) (window-live-p win))
                            (workbench--vterm-resize buf win)))))))))
