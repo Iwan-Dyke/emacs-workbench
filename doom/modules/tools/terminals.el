@@ -52,8 +52,13 @@ Each workspace maintains its own terminal and layout state independently."
         ;; Restore
         (let ((config (gethash ws workbench--popup-terminal-configs)))
           (remhash ws workbench--popup-terminal-configs)
-          (when (window-configuration-p config)
-            (set-window-configuration config)))
+          (if (and (window-configuration-p config)
+                   (eq (window-configuration-frame config) (selected-frame)))
+              (set-window-configuration config)
+            ;; Config is stale (wrong frame or not a config) — just bury the
+            ;; popup buffer and let the workspace's normal layout show through.
+            (when-let ((buf (get-buffer (workbench--popup-terminal-buffer-name))))
+              (bury-buffer buf))))
       ;; Takeover
       (puthash ws (current-window-configuration) workbench--popup-terminal-configs)
       (let ((ignore-window-parameters t))
