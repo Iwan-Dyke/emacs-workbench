@@ -83,3 +83,16 @@ Each workspace maintains its own magit buffer and layout state independently."
       (remhash ws workbench--popup-magit-configs))))
 
 (add-hook 'persp-activated-functions #'workbench--popup-magit-clear-stale)
+
+(defun workbench--popup-magit-clear-frame (frame)
+  "Remove hash entries whose saved window-configuration belongs to FRAME."
+  (let ((stale-keys nil))
+    (maphash (lambda (ws config)
+               (when (and (window-configuration-p config)
+                          (eq (window-configuration-frame config) frame))
+                 (push ws stale-keys)))
+             workbench--popup-magit-configs)
+    (dolist (ws stale-keys)
+      (remhash ws workbench--popup-magit-configs))))
+
+(add-hook 'delete-frame-functions #'workbench--popup-magit-clear-frame)

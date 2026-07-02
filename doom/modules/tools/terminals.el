@@ -82,3 +82,16 @@ Each workspace maintains its own terminal and layout state independently."
       (remhash ws workbench--popup-terminal-configs))))
 
 (add-hook 'persp-activated-functions #'workbench--popup-terminal-clear-stale)
+
+(defun workbench--popup-terminal-clear-frame (frame)
+  "Remove hash entries whose saved window-configuration belongs to FRAME."
+  (let ((stale-keys nil))
+    (maphash (lambda (ws config)
+               (when (and (window-configuration-p config)
+                          (eq (window-configuration-frame config) frame))
+                 (push ws stale-keys)))
+             workbench--popup-terminal-configs)
+    (dolist (ws stale-keys)
+      (remhash ws workbench--popup-terminal-configs))))
+
+(add-hook 'delete-frame-functions #'workbench--popup-terminal-clear-frame)
