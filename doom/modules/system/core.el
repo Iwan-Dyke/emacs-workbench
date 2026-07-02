@@ -18,6 +18,7 @@
                      "personal")))
     (if (member profile '("personal" "work"))
         profile
+      (warn "Workbench: unknown profile '%s', defaulting to personal" profile)
       "personal"))
   "Active Emacs Workbench profile.")
 
