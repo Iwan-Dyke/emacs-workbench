@@ -101,5 +101,15 @@ current project (or `default-directory') and focuses it."
   ;; Internal var; may disappear in future treemacs versions.
   (when (boundp 'treemacs--width-is-locked)
     (setq treemacs--width-is-locked nil))
+  ;; Enable evil-compatible keybindings for file operations (cf, cd, d, R, etc.)
+  ;; treemacs-evil lives in treemacs/src/extra/ which straight doesn't auto-add
+  ;; to load-path, so ensure it's reachable.
+  (let ((extra-dir (expand-file-name
+                    "straight/repos/treemacs/src/extra/"
+                    (or (bound-and-true-p straight-base-dir)
+                        (expand-file-name ".local/" user-emacs-directory)))))
+    (when (file-directory-p extra-dir)
+      (add-to-list 'load-path extra-dir)))
+  (require 'treemacs-evil)
   (treemacs-follow-mode +1)
   (treemacs-git-mode 'deferred))
