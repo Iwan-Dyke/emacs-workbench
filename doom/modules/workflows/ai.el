@@ -91,15 +91,79 @@ Launches at the project root so the agent sees the whole project."
         (workbench--vterm-resize buffer window)
         (vterm-send-string command)
         (vterm-send-return)
-        ;; The child process queries pty dimensions on startup. The initial
-        ;; resize above happens before the process reads them, so re-send
-        ;; the size once the process has had time to initialize.
-        (let ((buf buffer) (win window))
-          (run-at-time 1.0 nil
-                       (lambda ()
-                         (when (and (buffer-live-p buf) (window-live-p win))
-                           (workbench--vterm-resize buf win)))))))))
+        ;; CLI tools (kiro-cli, claude) take variable time to initialize.
+        ;; A single delayed resize often fires before the child process is
+        ;; ready to receive SIGWINCH. Use staggered timers to catch the
+        ;; process at whatever stage it becomes responsive, plus a
+        ;; process-output hook for the earliest reliable moment.
+        (workbench--schedule-ai-pane-resizes buffer window)))))
 
+
+(defvar-local workbench--ai-pane-resize-timer nil
+  "Pending resize timer for an AI pane buffer.")
+
+(defvar-local workbench--ai-pane-resize-done nil
+  "Non-nil once the AI pane has confirmed a successful resize via output.")
+
+(defvar-local workbench--ai-pane-resize-window nil
+  "The window the AI pane is displayed in, used by the output resizer.")
+
+(defun workbench--schedule-ai-pane-resizes (buffer window)
+  "Schedule a delayed resize for BUFFER displayed in WINDOW.
+Also hooks into process output so the resize fires the instant the
+CLI tool writes its first output (proving it's alive). The 5s timer
+is a fallback in case the output hook doesn't fire."
+  (with-current-buffer buffer
+    (setq workbench--ai-pane-resize-done nil)
+    (setq workbench--ai-pane-resize-window window)
+    (let ((buf buffer) (win window))
+      (setq workbench--ai-pane-resize-timer
+            (run-at-time 5.0 nil
+                         (lambda ()
+                           (when (and (buffer-live-p buf) (window-live-p win))
+                             (workbench--vterm-resize buf win)
+                             ;; Clean up the output filter if it never fired.
+                             (when (and (buffer-live-p buf)
+                                        (not (buffer-local-value
+                                              'workbench--ai-pane-resize-done buf)))
+                               (workbench--ai-pane-remove-output-filter buf))))))
+      ;; Defer attaching the output filter — vterm replaces its process
+      ;; filter during init, so adding immediately would be silently lost.
+      (run-at-time 0.1 nil
+                   (lambda ()
+                     (when (buffer-live-p buf)
+                       (when-let ((proc (get-buffer-process buf)))
+                         (add-function :after (process-filter proc)
+                                       #'workbench--ai-pane-output-resize-filter
+                                       '((name . workbench-ai-resize))))))))))
+
+(defun workbench--ai-pane-remove-output-filter (buffer)
+  "Safely remove the resize output filter from BUFFER's process.
+No-op if the process is dead or the filter was already removed."
+  (ignore-errors
+    (when-let ((proc (and (buffer-live-p buffer)
+                          (get-buffer-process buffer))))
+      (when (process-live-p proc)
+        (remove-function (process-filter proc)
+                         #'workbench--ai-pane-output-resize-filter)))))
+
+(defun workbench--ai-pane-output-resize-filter (proc _output)
+  "Resize the AI pane on first process output, then remove self.
+Uses buffer-local variables to find the target window and state."
+  (when-let ((buf (process-buffer proc)))
+    (when (and (buffer-live-p buf)
+               (not (buffer-local-value 'workbench--ai-pane-resize-done buf)))
+      (with-current-buffer buf
+        (let ((win workbench--ai-pane-resize-window))
+          (when (window-live-p win)
+            (setq workbench--ai-pane-resize-done t)
+            (workbench--vterm-resize buf win)
+            ;; Cancel the fallback timer.
+            (when (timerp workbench--ai-pane-resize-timer)
+              (cancel-timer workbench--ai-pane-resize-timer)
+              (setq workbench--ai-pane-resize-timer nil))
+            ;; Remove ourselves from the process filter.
+            (workbench--ai-pane-remove-output-filter buf)))))))
 
 (defun workbench--toggle-project-ai (tool)
   "Toggle TOOL as the project AI pane for the current workspace."
