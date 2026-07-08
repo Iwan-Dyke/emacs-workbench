@@ -22,16 +22,26 @@
   (remove-hook 'server-done-hook #'+workspaces-delete-associated-workspace-h))
 
 (defun workbench/open-startup-workspaces ()
-  "Open the startup workspaces: a files browser and the default AI agent.
+  "Open the startup workspaces: agenda, AI agent, and files browser.
+Order: dashboard → agenda → ai → files (ADR 0042, ADR 0065).
 Leaves the original (dashboard) workspace selected."
   (interactive)
   (unless (and (fboundp '+workspace-switch)
                (fboundp '+workspace-current-name))
     (user-error "Doom workspaces are not available"))
   (let ((starting-workspace (+workspace-current-name)))
+    ;; Agenda workspace
+    (+workspace-switch "agenda" t)
+    (when (fboundp 'workbench-org/open-agenda)
+      (condition-case nil
+          (workbench-org/open-agenda)
+        (error nil)))
+    ;; AI workspace
+    (workbench/open-default-ai-workspace)
+    ;; Files workspace
     (+workspace-switch "files" t)
     (workbench/open-files)
-    (workbench/open-default-ai-workspace)
+    ;; Return to dashboard
     (+workspace-switch starting-workspace t)
     (+workspace/display)))
 

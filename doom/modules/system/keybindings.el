@@ -10,6 +10,16 @@
        :desc "Resize windows" "r" #'workbench/resize-mode
        :desc "Switch theme" "t" #'workbench/switch-theme)
 
+      (:prefix-map ("n" . "notes")
+       :desc "Open agenda" "a" #'workbench-org/open-agenda
+       :desc "Weeknote" "w" #'workbench-org/open-weeknote
+       :desc "Find node" "f" #'org-roam-node-find
+       :desc "Insert link" "i" #'org-roam-node-insert
+       :desc "Backlinks" "b" #'org-roam-buffer-toggle
+       :desc "Capture" "c" #'org-capture
+       :desc "Discover ADRs" "d" #'workbench-org-discover-adrs
+       :desc "Open jira.org" "j" #'workbench-org/open-jira-file)
+
       (:prefix-map ("t" . "terminals")
        :desc "New terminal workspace" "t" #'workbench/open-terminal-workspace
        :desc "Toggle popup terminal" "p" #'workbench/toggle-popup-terminal
@@ -55,3 +65,23 @@
         "C-k" #'evil-window-up
         "C-l" #'workbench/window-right
         "C-t" #'workbench/toggle-popup-terminal))
+
+;;; ── Org Agenda ─────────────────────────────────────────────────────────────
+
+(after! org-agenda
+  (evil-set-initial-state 'org-agenda-mode 'normal)
+  (evil-define-key 'normal org-agenda-mode-map
+    "j" #'org-agenda-next-line
+    "k" #'org-agenda-previous-line
+    (kbd "RET") #'org-agenda-switch-to
+    "o" #'org-agenda-open-link
+    "t" #'org-agenda-todo
+    "s" #'org-agenda-schedule
+    "d" #'org-agenda-deadline
+    "r" #'org-agenda-redo
+    "q" #'org-agenda-quit
+    "i" #'org-agenda-clock-in
+    "O" #'org-agenda-clock-out
+    "/" #'org-agenda-filter-by-tag
+    "f" #'org-agenda-later
+    "b" #'org-agenda-earlier))
