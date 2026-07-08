@@ -43,23 +43,35 @@ gets correct window dimensions on first draw."
           (setq default-directory root)
           (current-buffer))))))
 
+(defun workbench--popup-terminal-showing-p ()
+  "Return non-nil if the popup terminal buffer is currently displayed."
+  (let ((buf (get-buffer (workbench--popup-terminal-buffer-name))))
+    (and (buffer-live-p buf)
+         (eq (current-buffer) buf))))
+
 (defun workbench/toggle-popup-terminal ()
   "Toggle a full-frame project shell scoped to the current workspace.
 Each workspace maintains its own terminal and layout state independently."
   (interactive)
   (let ((ws (+workspace-current-name)))
-    (if (gethash ws workbench--popup-terminal-configs)
-        ;; Restore
+    (if (workbench--popup-terminal-showing-p)
+        ;; Hide — restore previous layout
         (let ((config (gethash ws workbench--popup-terminal-configs)))
           (remhash ws workbench--popup-terminal-configs)
-          (if (and (window-configuration-p config)
-                   (eq (window-configuration-frame config) (selected-frame)))
-              (set-window-configuration config)
-            ;; Config is stale (wrong frame or not a config) — just bury the
-            ;; popup buffer and let the workspace's normal layout show through.
+          (cond
+           ;; Valid config for this frame — restore it
+           ((and (window-configuration-p config)
+                 (eq (window-configuration-frame config) (selected-frame)))
+            (set-window-configuration config))
+           ;; Stale or missing config — bury and switch to a sensible buffer
+           (t
             (when-let ((buf (get-buffer (workbench--popup-terminal-buffer-name))))
-              (bury-buffer buf))))
-      ;; Takeover
+              (bury-buffer buf))
+            ;; Try to show the workspace's previous buffer rather than leaving
+            ;; the user staring at a random or dead buffer.
+            (when (eq (current-buffer) (get-buffer (workbench--popup-terminal-buffer-name)))
+              (switch-to-buffer (other-buffer (current-buffer) t))))))
+      ;; Show — save layout and take over the frame
       (puthash ws (current-window-configuration) workbench--popup-terminal-configs)
       (let ((ignore-window-parameters t))
         (delete-other-windows))
@@ -74,11 +86,16 @@ Each workspace maintains its own terminal and layout state independently."
 ;; actually the current buffer (persp overwrote it), discard the stale state
 ;; so C-t works cleanly as a fresh toggle.
 (defun workbench--popup-terminal-clear-stale (&rest _)
-  "Discard popup state if persp has already restored a different layout."
+  "Discard popup state if persp has already restored a different layout.
+When switching workspaces, persp restores its saved window-config which
+overwrites whatever was on screen. If there was popup state saved for the
+workspace we're entering, but the popup buffer isn't actually visible,
+the saved config is stale and toggling would restore a nonsensical layout."
   (let* ((ws (+workspace-current-name))
          (popup-buf (get-buffer (format "*workbench-popup-term:%s*" ws))))
     (when (and (gethash ws workbench--popup-terminal-configs)
-               (not (eq (current-buffer) popup-buf)))
+               (not (and (buffer-live-p popup-buf)
+                         (get-buffer-window popup-buf))))
       (remhash ws workbench--popup-terminal-configs))))
 
 (add-hook 'persp-activated-functions #'workbench--popup-terminal-clear-stale)
