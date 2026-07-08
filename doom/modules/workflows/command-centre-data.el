@@ -1,41 +1,26 @@
 ;;; workflows/command-centre-data.el -*- lexical-binding: t; -*-
 
-;; Data collection for the command centre: shell helpers, Jira fetching,
-;; git/repo status, infra checks, team data collection.
+;; Data collection for the command centre: git/repo status, infra checks,
+;; team data collection. Jira data comes from modules/tools/jira.el (ADR 0064).
 
-;;; ── Config ─────────────────────────────────────────────────────────────────
+;;; ── Compatibility aliases ──────────────────────────────────────────────────
+;; The command centre SVG and team renderers reference these names.
+;; They now delegate to the shared Jira module.
 
-(defvar workbench-cc--jira-project nil
-  "Jira project key for the command centre. Set in profiles/local.el.")
-(defvar workbench-cc--jira-user nil
-  "Jira username (email) for the command centre. Set in profiles/local.el.")
-(defvar workbench-cc--git-author nil
-  "Git author name fragment for filtering commits. Set in profiles/local.el.")
-(defvar workbench-cc--code-root "~/code/"
-  "Root directory to scan for git repositories.")
-(defvar workbench-cc--spark-url "http://localhost:8888"
-  "URL to health-check the local Spark environment.")
+(defvaralias 'workbench-cc--jira-project 'workbench-jira-project)
+(defvaralias 'workbench-cc--jira-user 'workbench-jira-user)
+(defvaralias 'workbench-cc--git-author 'workbench-jira-git-author)
+(defvaralias 'workbench-cc--code-root 'workbench-jira-code-root)
+(defvaralias 'workbench-cc--spark-url 'workbench-jira-spark-url)
+(defvaralias 'workbench-cc--team-name 'workbench-jira-team-name)
+(defvaralias 'workbench-cc--team-id 'workbench-jira-team-id)
+(defvaralias 'workbench-cc--team-wip-limit 'workbench-jira-team-wip-limit)
+(defvaralias 'workbench-cc--team-members 'workbench-jira-team-members)
+(defvaralias 'workbench-cc--team-status-next 'workbench-jira-status-next)
+(defvaralias 'workbench-cc--team-status-wip 'workbench-jira-status-wip)
+(defvaralias 'workbench-cc--team-status-done 'workbench-jira-status-done)
 
-;; Team lead view config (ADR 0063)
-(defvar workbench-cc--team-name nil
-  "Team display name for the team lead view. Set in profiles/local.el.")
-(defvar workbench-cc--team-id nil
-  "Jira team UUID for JQL filtering. Set in profiles/local.el.")
-(defvar workbench-cc--team-wip-limit 2
-  "WIP limit for the team (items In Progress).")
-(defvar workbench-cc--team-members nil
-  "List of team member display names for filtering.
-Set in profiles/local.el as a list of strings.")
-
-;; Team board statuses (may differ from main board statuses)
-(defvar workbench-cc--team-status-next "Next"
-  "Status name for the team's 'next up' column.")
-(defvar workbench-cc--team-status-wip "In Progress"
-  "Status name for the team's active work column.")
-(defvar workbench-cc--team-status-done "Done"
-  "Status name for the team's completed column.")
-
-;;; ── Shell Helpers ──────────────────────────────────────────────────────────
+;;; ── Shell Helpers (for non-Jira data: git, infra) ──────────────────────────
 
 (defun workbench-cc--shell (dir &rest args)
   "Run ARGS in DIR, return trimmed stdout or nil."
@@ -50,87 +35,27 @@ Set in profiles/local.el as a list of strings.")
     (and (not (string-empty-p out))
          (split-string out "\n" t))))
 
-(defun workbench-cc--shell-or-error (dir &rest args)
-  "Run ARGS in DIR. Return (:ok OUTPUT) or (:error REASON).
-Distinguishes command-not-found, non-zero exit, and empty output."
-  (let ((default-directory (expand-file-name (or dir "~/")))
-        (cmd (car args)))
-    (if (not (executable-find cmd))
-        (list :error (format "%s not found" cmd))
-      (with-temp-buffer
-        (let ((exit (apply #'call-process cmd nil t nil (cdr args))))
-          (if (zerop exit)
-              (list :ok (string-trim (buffer-string)))
-            (list :error (format "%s exited %d" cmd exit))))))))
+;;; ── Jira (delegated to shared module) ──────────────────────────────────────
 
-;;; ── Jira ───────────────────────────────────────────────────────────────────
-
-(defun workbench-cc--error-p (result)
-  "Return non-nil if RESULT is an error plist from a fetch function."
-  (and (consp result) (eq :error (car result))))
-
-(defun workbench-cc--error-reason (result)
-  "Return the error reason string from RESULT."
-  (cadr result))
+(defalias 'workbench-cc--error-p #'workbench-jira-error-p)
+(defalias 'workbench-cc--error-reason #'workbench-jira-error-reason)
+(defalias 'workbench-cc--days-since-update #'workbench-jira-days-since-update)
 
 (defun workbench-cc--jira-tickets ()
-  "Fetch In Progress tickets. Returns list of plists, or (:error REASON)."
-  (if (not (and workbench-cc--jira-project workbench-cc--jira-user))
-      (list :error "Jira project/user not configured")
-    (let ((result (workbench-cc--shell-or-error
-                   nil "jira" "issue" "list"
-                   "-p" workbench-cc--jira-project
-                   "-a" workbench-cc--jira-user
-                   "-s" "In Progress"
-                   "--plain" "--no-headers"
-                   "--columns" "KEY,SUMMARY,TYPE,UPDATED")))
-      (if (eq :error (car result))
-          result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (mapcar (lambda (line)
-                      (let ((parts (split-string line "\t+" nil)))
-                        (list :key (string-trim (or (nth 0 parts) ""))
-                              :summary (string-trim (or (nth 1 parts) ""))
-                              :type (string-trim (or (nth 2 parts) ""))
-                              :updated (string-trim (or (nth 3 parts) "")))))
-                    (split-string output "\n" t))))))))
-
-(defun workbench-cc--ticket-last-comment-date (key)
-  "Get date of last comment on KEY, or nil."
-  (when-let ((output (workbench-cc--shell
-                      nil "jira" "issue" "view" key "--plain")))
-    ;; Pattern: "Author • Date • Latest comment"
-    (when (string-match "• \\([A-Z][a-z]+, [0-9]+ [A-Z][a-z]+ [0-9]+\\) •" output)
-      (match-string 1 output))))
+  "Fetch In Progress tickets via shared Jira module."
+  (workbench-jira--fetch-tickets))
 
 (defun workbench-cc--ticket-details (key)
-  "Get extra details for KEY: last comment snippet and parent."
-  (when-let ((output (workbench-cc--shell
-                      nil "jira" "issue" "view" key "--comments" "1" "--plain")))
-    (let ((parent nil) (comment nil))
-      ;; Parent: look for "Parent: KEY" or linked feature
-      (when (string-match "Parent:\\s-*\\([A-Z]+-[0-9]+\\)" output)
-        (setq parent (match-string 1 output)))
-      ;; Last comment body: first non-empty line after "Latest comment"
-      (when (string-match "Latest comment[^\n]*\n\\(?:\\s-*\n\\)*\\s-*\\(.+\\)" output)
-        (setq comment (string-trim (match-string 1 output))))
-      (list :parent parent :comment comment))))
+  "Get extra details for KEY via shared Jira module."
+  (workbench-jira--ticket-details key))
 
 (defun workbench-cc--ticket-commented-today-p (key)
   "Return t if KEY has a comment from today."
-  (when-let ((date-str (workbench-cc--ticket-last-comment-date key)))
-    (let ((today (format-time-string "%d %b %y")))
-      (string-match-p (regexp-quote today) date-str))))
+  (workbench-jira--ticket-commented-today-p key))
 
-(defun workbench-cc--days-since-update (updated-str)
-  "Return days since UPDATED-STR, or nil if unparseable."
-  (condition-case nil
-      (let* ((time (date-to-time updated-str))
-             (diff (time-subtract (current-time) time)))
-        (/ (float-time diff) 86400.0))
-    (error nil)))
+(defun workbench-cc--ticket-last-comment-date (key)
+  "Get date of last comment on KEY."
+  (workbench-jira--ticket-last-comment-date key))
 
 ;;; ── Git / Repos ────────────────────────────────────────────────────────────
 
@@ -204,55 +129,15 @@ Distinguishes command-not-found, non-zero exit, and empty output."
                                        workbench-cc--spark-url))
                  (error nil))))
 
-;;; ── Jira Done / Next ───────────────────────────────────────────────────────
+;;; ── Jira Done / Next (delegated) ────────────────────────────────────────────
 
 (defun workbench-cc--jira-done ()
-  "Fetch recently Done tickets (last 3). Returns list of plists, or (:error REASON)."
-  (if (not (and workbench-cc--jira-project workbench-cc--jira-user))
-      (list :error "Jira project/user not configured")
-    (let ((result (workbench-cc--shell-or-error
-                   nil "jira" "issue" "list"
-                   "-p" workbench-cc--jira-project
-                   "-a" workbench-cc--jira-user
-                   "-s" "Done"
-                   "--plain" "--no-headers"
-                   "--columns" "KEY,SUMMARY")))
-      (if (eq :error (car result))
-          result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (seq-take
-             (mapcar (lambda (line)
-                       (let ((parts (split-string line "\t+" nil)))
-                         (list :key (string-trim (or (nth 0 parts) ""))
-                               :summary (string-trim (or (nth 1 parts) "")))))
-                     (split-string output "\n" t))
-             3)))))))
+  "Fetch recently Done tickets via shared Jira module."
+  (workbench-jira--fetch-done))
 
 (defun workbench-cc--jira-next ()
-  "Fetch Next queue tickets (top 3). Returns list of plists, or (:error REASON)."
-  (if (not workbench-cc--jira-project)
-      (list :error "Jira project not configured")
-    (let ((result (workbench-cc--shell-or-error
-                   nil "jira" "issue" "list"
-                   "-p" workbench-cc--jira-project
-                   "-s" "Next"
-                   "--plain" "--no-headers"
-                   "--columns" "KEY,SUMMARY,TYPE")))
-      (if (eq :error (car result))
-          result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (seq-take
-             (mapcar (lambda (line)
-                       (let ((parts (split-string line "\t+" nil)))
-                         (list :key (string-trim (or (nth 0 parts) ""))
-                               :summary (string-trim (or (nth 1 parts) ""))
-                               :type (string-trim (or (nth 2 parts) "")))))
-                     (split-string output "\n" t))
-             3)))))))
+  "Fetch Next queue tickets via shared Jira module."
+  (workbench-jira--fetch-next))
 
 ;;; ── Collect All (IC view) ──────────────────────────────────────────────────
 
@@ -284,39 +169,12 @@ Jira fields may contain (:error REASON) instead of a list when fetch fails."
 ;;; ── Team Lead Data Collection ───────────────────────────────────────────────
 
 (defun workbench-cc--team-tickets-by-status (status)
-  "Fetch team tickets in STATUS via JQL. Returns list of plists, or (:error REASON)."
-  (if (not (and workbench-cc--jira-project workbench-cc--team-id))
-      (list :error "Jira project/team not configured")
-    (let* ((jql (format "project = %s AND team = \"%s\" AND status = \"%s\""
-                        workbench-cc--jira-project workbench-cc--team-id status))
-           (result (workbench-cc--shell-or-error
-                    nil "jira" "issue" "list"
-                    "--jql" jql
-                    "--plain" "--no-headers"
-                    "--columns" "KEY,SUMMARY,ASSIGNEE,UPDATED")))
-      (if (eq :error (car result))
-          result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (mapcar (lambda (line)
-                      (let ((parts (split-string line "\t+" nil)))
-                        (list :key (string-trim (or (nth 0 parts) ""))
-                              :summary (string-trim (or (nth 1 parts) ""))
-                              :assignee (string-trim (or (nth 2 parts) ""))
-                              :updated (string-trim (or (nth 3 parts) "")))))
-                    (split-string output "\n" t))))))))
+  "Fetch team tickets in STATUS via shared Jira module."
+  (workbench-jira--fetch-team-by-status status))
 
 (defun workbench-cc--team-ticket-last-comment (key)
   "Get last comment snippet and author for KEY."
-  (when-let ((output (workbench-cc--shell
-                      nil "jira" "issue" "view" key "--comments" "1" "--plain")))
-    (let ((author nil) (snippet nil))
-      (when (string-match "\\([A-Za-z ]+\\) •.*• Latest comment" output)
-        (setq author (string-trim (match-string 1 output))))
-      (when (string-match "Latest comment[^\n]*\n\\(?:\\s-*\n\\)*\\s-*\\(.+\\)" output)
-        (setq snippet (string-trim (match-string 1 output))))
-      (list :author author :snippet snippet))))
+  (workbench-jira--team-ticket-last-comment key))
 
 (defun workbench-cc--team-attention-items (tickets)
   "Compute attention items from TICKETS (In Progress list).

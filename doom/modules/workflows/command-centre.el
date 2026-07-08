@@ -14,6 +14,7 @@
 (defvar workbench-cc--timer nil "Auto-refresh timer.")
 (defvar workbench-cc--data nil "Cached dashboard data.")
 (defvar workbench-cc--async-process nil "Current async fetch process, or nil.")
+(defvar workbench-cc--async-timeout nil "Timeout timer for the current async fetch.")
 
 (defun workbench-cc--render-current ()
   "Render the current cached data without refetching."
@@ -31,26 +32,33 @@ failure. Kills the child process after 60 seconds if it hangs."
   (when (and workbench-cc--async-process
              (process-live-p workbench-cc--async-process))
     (delete-process workbench-cc--async-process))
-  (let* ((data-file (expand-file-name
+  (when (timerp workbench-cc--async-timeout)
+    (cancel-timer workbench-cc--async-timeout)
+    (setq workbench-cc--async-timeout nil))
+  (let* ((jira-file (expand-file-name
+                     "modules/tools/jira.el"
+                     doom-user-dir))
+         (data-file (expand-file-name
                      "modules/workflows/command-centre-data.el"
                      doom-user-dir))
          (view workbench/command-centre-view)
-         ;; Build an elisp form that loads the data module with all config,
-         ;; runs the collection, and prints the result as a sexp.
+         ;; Build an elisp form that loads the jira + data modules with all
+         ;; config, runs the collection, and prints the result as a sexp.
          (form `(progn
                   ;; Set config variables before loading
-                  (setq workbench-cc--jira-project ,workbench-cc--jira-project
-                        workbench-cc--jira-user ,workbench-cc--jira-user
-                        workbench-cc--git-author ,workbench-cc--git-author
-                        workbench-cc--code-root ,workbench-cc--code-root
-                        workbench-cc--spark-url ,workbench-cc--spark-url
-                        workbench-cc--team-name ,workbench-cc--team-name
-                        workbench-cc--team-id ,workbench-cc--team-id
-                        workbench-cc--team-wip-limit ,workbench-cc--team-wip-limit
-                        workbench-cc--team-members ',workbench-cc--team-members
-                        workbench-cc--team-status-next ,workbench-cc--team-status-next
-                        workbench-cc--team-status-wip ,workbench-cc--team-status-wip
-                        workbench-cc--team-status-done ,workbench-cc--team-status-done)
+                  (setq workbench-jira-project ,workbench-jira-project
+                        workbench-jira-user ,workbench-jira-user
+                        workbench-jira-git-author ,workbench-jira-git-author
+                        workbench-jira-code-root ,workbench-jira-code-root
+                        workbench-jira-spark-url ,workbench-jira-spark-url
+                        workbench-jira-team-name ,workbench-jira-team-name
+                        workbench-jira-team-id ,workbench-jira-team-id
+                        workbench-jira-team-wip-limit ,workbench-jira-team-wip-limit
+                        workbench-jira-team-members ',workbench-jira-team-members
+                        workbench-jira-status-next ,workbench-jira-status-next
+                        workbench-jira-status-wip ,workbench-jira-status-wip
+                        workbench-jira-status-done ,workbench-jira-status-done)
+                  (load ,jira-file nil t)
                   (load ,data-file nil t)
                   (let ((result ,(pcase view
                                    ('team-lead '(workbench-cc--collect-team-lead))
@@ -66,6 +74,10 @@ failure. Kills the child process after 60 seconds if it hangs."
                 :sentinel
                 (lambda (process _event)
                   (when (memq (process-status process) '(exit signal))
+                    ;; Cancel the timeout timer — process finished.
+                    (when (timerp workbench-cc--async-timeout)
+                      (cancel-timer workbench-cc--async-timeout)
+                      (setq workbench-cc--async-timeout nil))
                     (let ((result nil))
                       (if (zerop (process-exit-status process))
                           (with-current-buffer (process-buffer process)
@@ -82,12 +94,13 @@ failure. Kills the child process after 60 seconds if it hangs."
                       (funcall callback result)))))))
     (setq workbench-cc--async-process proc)
     ;; Timeout: kill after 60s if still running
-    (run-at-time 60 nil
-                 (lambda ()
-                   (when (and (process-live-p proc)
-                              (eq workbench-cc--async-process proc))
-                     (message "Command centre: fetch timed out after 60s")
-                     (delete-process proc))))))
+    (setq workbench-cc--async-timeout
+          (run-at-time 60 nil
+                       (lambda ()
+                         (when (and (process-live-p proc)
+                                    (eq workbench-cc--async-process proc))
+                           (message "Command centre: fetch timed out after 60s")
+                           (delete-process proc)))))))
 
 (defun workbench-cc-refresh ()
   "Refetch data asynchronously and refresh the command centre dashboard."
@@ -153,30 +166,67 @@ failure. Kills the child process after 60 seconds if it hangs."
         (switch-to-buffer workbench-cc--buffer-name)
         (workbench-cc-mode)
         (workbench-cc-refresh))
-    ;; First open — use sync so the buffer appears immediately
-    (workbench-cc-refresh-sync)
-    (when-let ((buf (get-buffer workbench-cc--buffer-name)))
+    ;; First open — show placeholder and fetch async
+    (let ((buf (get-buffer-create workbench-cc--buffer-name)))
+      (with-current-buffer buf
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert "Command centre loading...")))
       (switch-to-buffer buf)
-      (workbench-cc-mode)))
+      (workbench-cc-mode))
+    (workbench-cc-refresh))
   (unless workbench-cc--timer
     (setq workbench-cc--timer
           (run-at-time 300 300 #'workbench-cc--maybe-refresh))))
 
 (defun workbench-cc--startup ()
   "Show command centre on startup (work profile only).
-Suppresses Doom's dashboard immediately but defers SVG rendering to the first
-graphic frame, since `face-attribute' returns `unspecified' in a headless daemon."
+Suppresses Doom's dashboard immediately but defers SVG rendering until after
+startup workspaces have been created. This avoids a race where session.el
+switches back to the dashboard workspace and buries the command centre buffer."
   (when (string= workbench/profile "work")
-    (setq +doom-dashboard-functions nil)
-    (add-hook 'server-after-make-frame-hook #'workbench-cc--show-on-frame)))
+    (setq +dashboard-functions nil
+          initial-buffer-choice nil)
+    ;; Prevent Doom from reopening the dashboard buffer on workspace switch
+    (advice-add '+dashboard-init-h :override #'ignore)
+    (if (daemonp)
+        ;; Daemon: hook after startup workspaces via an advice that fires once.
+        (advice-add 'workbench/open-startup-workspaces :after
+                    #'workbench-cc--after-startup-workspaces)
+      ;; Non-daemon fallback
+      (add-hook 'window-setup-hook #'workbench-cc--show-on-frame))))
+
+(defun workbench-cc--after-startup-workspaces (&rest _)
+  "Show the command centre after startup workspaces have been created.
+Self-removing — runs once then removes itself."
+  (advice-remove 'workbench/open-startup-workspaces
+                 #'workbench-cc--after-startup-workspaces)
+  (workbench-cc--show-on-frame))
 
 (defun workbench-cc--show-on-frame ()
-  "Render and show the command centre in the new frame."
+  "Render and show the command centre in the new frame.
+Uses async fetch so the frame is responsive immediately.
+Switches to the main (dashboard) workspace first so the command centre
+replaces the Doom dashboard rather than appearing in whatever workspace
+happens to be current."
   (remove-hook 'server-after-make-frame-hook #'workbench-cc--show-on-frame)
-  (workbench-cc-refresh-sync)
-  (when-let ((buf (get-buffer workbench-cc--buffer-name)))
+  ;; Ensure we're in the main/dashboard workspace
+  (when (fboundp '+workspace-switch)
+    (+workspace-switch "main"))
+  ;; Kill the Doom dashboard buffer if it's squatting in the window
+  (when-let ((doom-buf (get-buffer "*doom*")))
+    (when (eq doom-buf (window-buffer))
+      (kill-buffer doom-buf)))
+  ;; Show a placeholder buffer immediately so the user sees something
+  (let ((buf (get-buffer-create workbench-cc--buffer-name)))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "Command centre loading...")))
     (switch-to-buffer buf)
-    (workbench-cc-mode)))
+    (workbench-cc-mode))
+  ;; Fetch data without blocking
+  (workbench-cc-refresh))
 
 ;; Run early so it suppresses doom dashboard before it renders
 (add-hook 'doom-init-ui-hook #'workbench-cc--startup -90)
