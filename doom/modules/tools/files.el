@@ -46,9 +46,11 @@ entry, passing back the directory and file it remembered; see
     (dired-goto-file file)))
 
 (defun workbench--selected-path ()
-  "Return the path at point in Dired or Dirvish."
-  (or (dired-get-file-for-visit)
-      (user-error "No file at point")))
+  "Return the path at point in Dired or Dirvish.
+Signals `user-error' if point is not on a file entry (e.g. header or blank line)."
+  (condition-case nil
+      (dired-get-file-for-visit)
+    (error (user-error "No file at point — move to a file entry first"))))
 
 (defun workbench--project-directory-for-path (path)
   "Return the project directory to open for PATH."
@@ -65,11 +67,24 @@ entry, passing back the directory and file it remembered; see
 
 (defun workbench--treemacs-display (directory)
   "Open Treemacs showing DIRECTORY as its only project, and focus it.
-Roots at DIRECTORY even when it is not a VCS project (ADR 0043)."
+Roots at DIRECTORY even when it is not a VCS project (ADR 0043).
+Uses `treemacs--init' to create the treemacs buffer non-interactively,
+avoiding `treemacs-select-window' and `treemacs' which prompt for a project."
   (require 'treemacs)
   (let ((path (treemacs--canonical-path (file-truename directory)))
         (name (workbench--directory-name directory)))
-    (treemacs-select-window)
+    (if (workbench--treemacs-window)
+        ;; Already visible — just select it and ensure correct project
+        (select-window (workbench--treemacs-window))
+      ;; Not visible — initialise non-interactively
+      (let ((buf (treemacs-get-local-buffer)))
+        (if buf
+            ;; Buffer exists but window is hidden — treemacs-select-window is
+            ;; safe here (won't prompt) because the buffer already exists.
+            (treemacs-select-window)
+          ;; No buffer — create from scratch
+          (treemacs--init path name))))
+    ;; Ensure DIRECTORY is the sole project shown
     (unless (treemacs-is-path path :in-workspace)
       (treemacs-do-add-project-to-workspace path name))
     (dolist (project (cl-remove-if
@@ -96,7 +111,15 @@ current project (or `default-directory') and focuses it."
   (evil-define-key 'normal dired-mode-map
     "r" #'revert-buffer))
 
+;; Set before treemacs loads — the persist file is read at load time and will
+;; prompt about missing projects unless this is already set.
+(setq treemacs-missing-project-action 'remove)
+
 (after! treemacs
+  ;; Silently remove projects whose paths no longer exist instead of prompting.
+  ;; Stale paths accumulate when repos are deleted or moved, and the prompt
+  ;; blocks non-interactive treemacs init (e.g. SPC p o full layout).
+  (setq treemacs-missing-project-action 'remove)
   ;; Unlock the tree's width so it can be resized like any other window
   ;; (SPC w r). Treemacs has three lock mechanisms:
   ;;   - `treemacs-width-is-initially-locked': locks on buffer creation

@@ -92,9 +92,9 @@
 ;;; ── workbench--selected-path ───────────────────────────────────────────────
 
 (ert-deftest files/selected-path/signals-error-when-no-file ()
-  "Signals user-error when dired-get-file-for-visit returns nil."
+  "Signals user-error when dired-get-file-for-visit errors (blank line)."
   (cl-letf (((symbol-function 'dired-get-file-for-visit)
-             (lambda () nil)))
+             (lambda () (error "No file on this line"))))
     (should-error (workbench--selected-path) :type 'user-error)))
 
 (ert-deftest files/selected-path/returns-file-when-present ()
