@@ -37,6 +37,7 @@ npm_language_packages=(
     bash-language-server
     yaml-language-server
     dockerfile-language-server-nodejs
+    @mermaid-js/mermaid-cli
 )
 
 go_language_packages=(
@@ -218,6 +219,7 @@ install_pipx_language_tools() {
 case "$platform" in
 Darwin)
     install_brew_language_tools
+    install_npm_language_tools
     ;;
 Linux)
     sudo_cmd="$(sudo_prefix || true)"

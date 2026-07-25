@@ -6,6 +6,7 @@
 (load! "modules/tools/git")
 (load! "modules/tools/terminals")
 (load! "modules/tools/languages")
+(load! "modules/tools/mermaid")
 (load! "modules/tools/formatting")
 (load! "modules/tools/jira")
 (load! "modules/workflows/coding")

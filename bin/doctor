@@ -84,6 +84,9 @@ check_optional_command shfmt
 check_optional_command yamlfmt
 check_optional_command terraform
 
+# Diagram rendering
+check_optional_command mmdc
+
 if [ -n "$doom_bin" ]; then
     printf "ok  doom found: %s\n" "$doom_bin"
 else
