@@ -187,6 +187,9 @@ failure. Kills the child process after 60 seconds if it hangs."
   (setq-local buffer-read-only t))
 
 (after! evil
+  (evil-set-initial-state 'workbench-cc-mode 'normal))
+
+(after! evil
   (evil-define-key 'normal workbench-cc-mode-map
     "r" #'workbench-cc-redraw
     "R" #'workbench-cc-refresh
@@ -237,10 +240,11 @@ switches back to the dashboard workspace and buries the command centre buffer."
 
 (defun workbench-cc--after-startup-workspaces (&rest _)
   "Show the command centre after startup workspaces have been created.
-Self-removing — runs once then removes itself."
+Self-removing — runs once then removes itself. Deferred with `run-at-time'
+so it executes after all frame/persp hooks have settled."
   (advice-remove 'workbench/open-startup-workspaces
                  #'workbench-cc--after-startup-workspaces)
-  (workbench-cc--show-on-frame))
+  (run-at-time 0.1 nil #'workbench-cc--show-on-frame))
 
 (defun workbench-cc--show-on-frame ()
   "Render and show the command centre in the new frame.

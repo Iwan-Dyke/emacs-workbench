@@ -111,6 +111,8 @@ re-collection."
     (use-local-map (make-composed-keymap workbench-project-dashboard-mode-map
                                          special-mode-map))
     (setq-local default-directory project-directory)
-    (setq-local workbench--dashboard-directory project-directory)))
+    (setq-local workbench--dashboard-directory project-directory)
+    (when (fboundp 'evil-normal-state)
+      (evil-normal-state))))
 
 (provide 'workbench-project-dashboard)
