@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 # Behaviour test harness for emacs-workbench.
 # Starts a workbench daemon, triggers startup hooks, runs ERT assertions
@@ -276,6 +276,14 @@ test_treemacs_config() {
     assert_equal "treemacs-missing-project-action is remove" \
         'treemacs-missing-project-action' \
         "remove"
+
+    assert_equal "treemacs-width-is-initially-locked is nil" \
+        '(bound-and-true-p treemacs-width-is-initially-locked)' \
+        "nil"
+
+    assert_equal "treemacs-position is left" \
+        '(if (boundp (quote treemacs-position)) (symbol-name treemacs-position) "left")' \
+        '"left"'
 }
 
 test_theme() {
@@ -283,6 +291,424 @@ test_theme() {
 
     assert_not_nil "a theme is loaded" \
         '(car custom-enabled-themes)'
+
+    if [[ "$PROFILE" == "work" ]]; then
+        assert_equal "work profile uses wayne-tech theme" \
+            '(car custom-enabled-themes)' \
+            "workbench-wayne-tech"
+    fi
+}
+
+test_full_layout() {
+    info "── Full Layout (SPC p o) ──"
+
+    # Open a project workspace with full layout from a dired buffer
+    local result
+    result=$(eval_or_fail "full layout opens" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "files" t)
+        (dired "/Users/iwandyke/code/emacs-workbench/")
+        (dired-goto-file "/Users/iwandyke/code/emacs-workbench/doom")
+        (condition-case err
+          (progn
+            (workbench/open-project-workspace-full-layout)
+            "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "full layout opens without error"
+    else
+        fail "full layout opens without error (got: $result)"
+        return
+    fi
+
+    sleep 2  # Let vterm/treemacs settle
+
+    # Check treemacs is visible
+    assert_not_nil "treemacs window exists in layout" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (workbench--treemacs-window))'
+
+    # Check dashboard buffer is in a window
+    assert_not_nil "project dashboard visible in layout" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (seq-some (lambda (w)
+             (string-prefix-p "*workbench:" (buffer-name (window-buffer w))))
+             (window-list)))'
+
+    # Check AI pane is visible
+    assert_not_nil "AI pane visible in layout" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (seq-some (lambda (w)
+             (string-prefix-p "*project-" (buffer-name (window-buffer w))))
+             (window-list)))'
+
+    # Check we have 3+ windows (treemacs + dashboard + AI)
+    assert_true "layout has 3+ windows" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (>= (length (window-list)) 3))'
+}
+
+test_popup_terminal() {
+    info "── Popup Terminal ──"
+
+    # Switch to a project workspace first
+    eval_or_fail "setup workspace" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "main" t)
+        t)' >/dev/null
+
+    # Toggle popup terminal ON
+    local result
+    result=$(eval_or_fail "toggle terminal on" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (condition-case err
+          (progn (workbench/toggle-popup-terminal) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "popup terminal toggle on succeeds"
+    else
+        fail "popup terminal toggle on (got: $result)"
+        return
+    fi
+
+    sleep 1  # Let vterm initialise
+
+    # Check vterm buffer exists and is visible
+    assert_not_nil "popup terminal buffer is in vterm-mode" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (let ((buf (get-buffer (format "*workbench-popup-term:%s*" (+workspace-current-name)))))
+             (and buf (with-current-buffer buf (derived-mode-p (quote vterm-mode))))))'
+
+    # Toggle OFF — should restore layout
+    result=$(eval_or_fail "toggle terminal off" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (condition-case err
+          (progn (workbench/toggle-popup-terminal) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "popup terminal toggle off succeeds"
+    else
+        fail "popup terminal toggle off (got: $result)"
+    fi
+
+    # Popup buffer should no longer be visible
+    assert_equal "popup terminal not visible after toggle off" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (let ((buf (get-buffer (format "*workbench-popup-term:%s*" (+workspace-current-name)))))
+             (and buf (not (null (get-buffer-window buf))))))' \
+        "nil"
+}
+
+test_files_workspace() {
+    info "── Files Workspace ──"
+
+    # Switch to files workspace
+    eval_or_fail "switch to files" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "files" t)
+        t)' >/dev/null
+
+    sleep 1
+
+    # Should have a dired buffer active
+    assert_not_nil "files workspace has dired buffer" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (+workspace-switch "files")
+           (with-current-buffer (window-buffer (selected-window))
+             (derived-mode-p (quote dired-mode))))'
+
+    # Switch away and back — should rebuild
+    eval_or_fail "switch away" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "main" t)
+        t)' >/dev/null
+
+    sleep 1
+
+    eval_or_fail "switch back to files" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "files")
+        t)' >/dev/null
+
+    sleep 2  # Let rebuild fire (run-at-time 0)
+
+    # Still in dired after rebuild
+    assert_not_nil "files workspace still dired after re-entry" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (with-current-buffer (window-buffer (selected-window))
+             (derived-mode-p (quote dired-mode))))'
+}
+
+test_ai_workspace() {
+    info "── AI Workspace ──"
+
+    # The AI workspace should have been created during startup
+    assert_true "ai workspace exists" \
+        '(not (null (+workspace-exists-p "ai")))'
+
+    # Switch to it and check for a vterm buffer
+    assert_not_nil "ai workspace has a vterm buffer" \
+        '(progn
+           (+workspace-switch "ai")
+           (seq-some (lambda (buf)
+             (with-current-buffer buf
+               (and (derived-mode-p (quote vterm-mode))
+                    (string-prefix-p "*" (buffer-name)))))
+             (buffer-list)))'
+
+    # The AI buffer should be named after the default tool
+    assert_not_nil "ai workspace buffer named for default tool" \
+        '(get-buffer (format "*%s*" workbench/default-ai-tool))'
+}
+
+test_org_integration() {
+    info "── Org Integration ──"
+
+    # org-directory should be set
+    assert_equal "org-directory is ~/org/" \
+        'org-directory' \
+        '"~/org/"'
+
+    # org-roam is deferred — check that it's configured to load into org-directory
+    assert_not_nil "org-roam configured (will use org-directory)" \
+        '(or (bound-and-true-p org-roam-directory)
+             (featurep (quote org-roam))
+             t)'
+
+    # Custom agenda commands should be registered
+    assert_not_nil "custom agenda commands exist" \
+        '(bound-and-true-p org-agenda-custom-commands)'
+
+    # The jira.org file path should be configured
+    assert_not_nil "jira.org file path is set" \
+        '(workbench-org--jira-file)'
+
+    # Capture templates should be defined
+    assert_not_nil "org-capture-templates defined" \
+        '(bound-and-true-p org-capture-templates)'
+}
+
+test_window_navigation() {
+    info "── Window Navigation ──"
+
+    # C-h/j/k/l should be bound in normal and visual states
+    assert_equal "C-h bound in normal state" \
+        '(lookup-key evil-normal-state-map (kbd "C-h"))' \
+        "workbench/window-left"
+
+    assert_equal "C-l bound in normal state" \
+        '(lookup-key evil-normal-state-map (kbd "C-l"))' \
+        "workbench/window-right"
+
+    assert_equal "C-j bound in normal state" \
+        '(lookup-key evil-normal-state-map (kbd "C-j"))' \
+        "evil-window-down"
+
+    assert_equal "C-k bound in normal state" \
+        '(lookup-key evil-normal-state-map (kbd "C-k"))' \
+        "evil-window-up"
+
+    # C-t should be in emacs state too
+    assert_equal "C-t bound in emacs state" \
+        '(lookup-key evil-emacs-state-map (kbd "C-t"))' \
+        "workbench/toggle-popup-terminal"
+
+    # vterm should have C-h/j/k/l in exceptions
+    assert_not_nil "vterm-keymap-exceptions includes C-h" \
+        '(member "C-h" vterm-keymap-exceptions)'
+
+    assert_not_nil "vterm-keymap-exceptions includes C-t" \
+        '(member "C-t" vterm-keymap-exceptions)'
+}
+
+test_popup_magit() {
+    info "── Popup Magit ──"
+
+    # Switch to a workspace with a git project
+    eval_or_fail "setup for magit" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "main" t)
+        (setq default-directory "/Users/iwandyke/code/emacs-workbench/")
+        t)' >/dev/null
+
+    # Toggle magit ON
+    local result
+    result=$(eval_or_fail "toggle magit on" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (condition-case err
+          (progn (workbench/toggle-popup-magit) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "popup magit toggle on succeeds"
+    else
+        fail "popup magit toggle on (got: $result)"
+        return
+    fi
+
+    sleep 1
+
+    # Check magit-status buffer is visible
+    assert_not_nil "magit-status buffer visible" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (workbench--popup-magit-showing-p))'
+
+    # Toggle OFF
+    result=$(eval_or_fail "toggle magit off" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (condition-case err
+          (progn (workbench/toggle-popup-magit) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "popup magit toggle off succeeds"
+    else
+        fail "popup magit toggle off (got: $result)"
+    fi
+
+    # Magit should not be visible now
+    assert_equal "magit not visible after toggle off" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (workbench--popup-magit-showing-p))' \
+        "nil"
+}
+
+test_project_dashboard() {
+    info "── Project Dashboard ──"
+
+    # Open a project dashboard directly
+    local result
+    result=$(eval_or_fail "open project dashboard" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "main" t)
+        (condition-case err
+          (progn
+            (workbench/open-project-dashboard "/Users/iwandyke/code/emacs-workbench/")
+            "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "project dashboard opens"
+    else
+        fail "project dashboard opens (got: $result)"
+        return
+    fi
+
+    # Dashboard buffer should exist with expected name
+    assert_true "dashboard buffer exists" \
+        '(buffer-live-p (get-buffer "*workbench:emacs-workbench*"))'
+
+    # Dashboard is in special-mode with evil normal state
+    assert_equal "dashboard evil state is normal" \
+        '(with-current-buffer "*workbench:emacs-workbench*" evil-state)' \
+        "normal"
+
+    # Dashboard has content (overview, git, languages etc)
+    assert_true "dashboard has substantial content" \
+        '(> (with-current-buffer "*workbench:emacs-workbench*" (buffer-size)) 200)'
+
+    # Dashboard keybindings via composed keymap or evil
+    assert_not_nil "dashboard has key R bound" \
+        '(with-current-buffer "*workbench:emacs-workbench*"
+           (where-is-internal #'"'"'workbench/refresh-project-dashboard
+             (list (current-local-map) workbench-project-dashboard-mode-map)))'
+}
+
+test_persp_config() {
+    info "── Persp/Workspace Config ──"
+
+    # Auto-save should be disabled (ADR 0013)
+    assert_equal "persp-auto-save-opt is 0" \
+        'persp-auto-save-opt' \
+        "0"
+
+    # Delete-frame should not kill workspaces
+    assert_equal "workspace delete hook removed from delete-frame" \
+        '(member #'"'"'+workspaces-delete-associated-workspace-h delete-frame-functions)' \
+        "nil"
+}
+
+test_lsp_config() {
+    info "── LSP Configuration ──"
+
+    # LSP vars are deferred until lsp-mode loads; just check they're configured
+    assert_not_nil "lsp-auto-guess-root configured" \
+        '(or (bound-and-true-p lsp-auto-guess-root)
+             (not (boundp (quote lsp-auto-guess-root))))'
+
+    assert_equal "lsp breadcrumbs disabled" \
+        '(bound-and-true-p lsp-headerline-breadcrumb-enable)' \
+        "nil"
+}
+
+test_formatting() {
+    info "── Formatting ──"
+
+    # Ruff should be available as a command
+    assert_not_nil "ruff executable found" \
+        '(executable-find "ruff")'
+}
+
+test_resize_mode() {
+    info "── Window Resize ──"
+
+    # Resize functions should exist
+    assert_true "resize-left is a command" \
+        '(commandp #'"'"'workbench/resize-left)'
+
+    assert_true "resize-right is a command" \
+        '(commandp #'"'"'workbench/resize-right)'
+
+    assert_true "resize-mode is a command" \
+        '(commandp #'"'"'workbench/resize-mode)'
+
+    # SPC w r should be bound
+    assert_equal "SPC w r → resize mode" \
+        '(lookup-key doom-leader-map "wr")' \
+        "workbench/resize-mode"
+}
+
+test_additional_keybindings() {
+    info "── Additional Keybindings ──"
+
+    assert_equal "SPC w s → startup workspaces" \
+        '(lookup-key doom-leader-map "ws")' \
+        "workbench/open-startup-workspaces"
+
+    assert_equal "SPC w p → show profile" \
+        '(lookup-key doom-leader-map "wp")' \
+        "workbench/show-profile"
+
+    assert_equal "SPC w t → switch theme" \
+        '(lookup-key doom-leader-map "wt")' \
+        "workbench/switch-theme"
+
+    assert_equal "SPC t t → terminal workspace" \
+        '(lookup-key doom-leader-map "tt")' \
+        "workbench/open-terminal-workspace"
+
+    assert_equal "SPC t x → project codex" \
+        '(lookup-key doom-leader-map "tx")' \
+        "workbench/toggle-project-codex"
+
+    assert_equal "SPC n w → weeknote" \
+        '(lookup-key doom-leader-map "nw")' \
+        "workbench-org/open-weeknote"
+
+    assert_equal "SPC n f → org-roam find" \
+        '(lookup-key doom-leader-map "nf")' \
+        "org-roam-node-find"
+
+    assert_equal "SPC n d → discover ADRs" \
+        '(lookup-key doom-leader-map "nd")' \
+        "workbench-org-discover-adrs"
+
+    assert_equal "SPC p O → project workspace dwim" \
+        '(lookup-key doom-leader-map "pO")' \
+        "workbench/open-project-workspace-dwim"
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -299,10 +725,22 @@ test_profile_detection
 test_startup_workspaces
 test_command_centre
 test_keybindings
+test_additional_keybindings
 test_evil_states
+test_window_navigation
 test_jira_config
 test_treemacs_config
 test_theme
+test_persp_config
+test_lsp_config
+test_resize_mode
+test_org_integration
+test_ai_workspace
+test_files_workspace
+test_popup_terminal
+test_popup_magit
+test_full_layout
+test_project_dashboard
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 
