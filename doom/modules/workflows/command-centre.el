@@ -45,6 +45,8 @@ failure. Kills the child process after 60 seconds if it hangs."
          ;; Build an elisp form that loads the jira + data modules with all
          ;; config, runs the collection, and prints the result as a sexp.
          (form `(progn
+                  ;; seq is needed by jira.el and command-centre-data.el
+                  (require 'seq)
                   ;; Set config variables before loading
                   (setq workbench-jira-project ,workbench-jira-project
                         workbench-jira-user ,workbench-jira-user
@@ -110,6 +112,19 @@ failure. Kills the child process after 60 seconds if it hangs."
    (lambda (data)
      (when data
        (setq workbench-cc--data data)
+       ;; Populate the shared Jira cache from CC data so org module stays in sync.
+       ;; IC view returns :tickets (personal), team-lead returns :wip (team).
+       ;; For the shared cache (used by org agenda), we need personal tickets.
+       ;; Only populate if the data contains :tickets (IC view); team-lead view
+       ;; doesn't fetch personal tickets so we must not overwrite with nil.
+       (let ((tickets (plist-get data :tickets)))
+         (when (and tickets (not (workbench-jira-error-p tickets)))
+           (setq workbench-jira--cache
+                 (list :tickets tickets
+                       :done (plist-get data :done)
+                       :next (plist-get data :next)))
+           (setq workbench-jira--cache-time (current-time))
+           (run-hooks 'workbench-jira-after-refresh-hook)))
        (workbench-cc--render-current)
        (message "Command centre: refreshed")))))
 
@@ -160,21 +175,19 @@ failure. Kills the child process after 60 seconds if it hangs."
 (defun workbench-cc-open ()
   "Open the command centre dashboard."
   (interactive)
-  (if workbench-cc--data
-      (progn
-        (workbench-cc--render-current)
-        (switch-to-buffer workbench-cc--buffer-name)
-        (workbench-cc-mode)
-        (workbench-cc-refresh))
-    ;; First open — show placeholder and fetch async
-    (let ((buf (get-buffer-create workbench-cc--buffer-name)))
-      (with-current-buffer buf
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (insert "Command centre loading...")))
-      (switch-to-buffer buf)
-      (workbench-cc-mode))
-    (workbench-cc-refresh))
+  (let ((buf (get-buffer-create workbench-cc--buffer-name)))
+    (switch-to-buffer buf)
+    (workbench-cc-mode)
+    (if workbench-cc--data
+        (progn
+          (workbench-cc--render-current)
+          ;; Refresh in background — existing data is shown immediately
+          (workbench-cc-refresh))
+      ;; First open — show placeholder and fetch async
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "Command centre loading..."))
+      (workbench-cc-refresh)))
   (unless workbench-cc--timer
     (setq workbench-cc--timer
           (run-at-time 300 300 #'workbench-cc--maybe-refresh))))
@@ -185,6 +198,11 @@ Suppresses Doom's dashboard immediately but defers SVG rendering until after
 startup workspaces have been created. This avoids a race where session.el
 switches back to the dashboard workspace and buries the command centre buffer."
   (when (string= workbench/profile "work")
+    ;; Prevent the Jira module's own timer from starting — the CC timer handles
+    ;; all Jira fetching and populates the shared cache. Remove the named hook
+    ;; function so it never fires.
+    (remove-hook 'doom-init-ui-hook #'workbench-jira--maybe-start-timer)
+    (workbench-jira-stop-timer)
     (setq +dashboard-functions nil
           initial-buffer-choice nil)
     ;; Prevent Doom from reopening the dashboard buffer on workspace switch
@@ -210,9 +228,9 @@ Switches to the main (dashboard) workspace first so the command centre
 replaces the Doom dashboard rather than appearing in whatever workspace
 happens to be current."
   (remove-hook 'server-after-make-frame-hook #'workbench-cc--show-on-frame)
-  ;; Ensure we're in the main/dashboard workspace
-  (when (fboundp '+workspace-switch)
-    (+workspace-switch "main"))
+  ;; Ensure we're in the first/default workspace
+  (when (fboundp '+workspace/switch-to)
+    (+workspace/switch-to 0))
   ;; Kill the Doom dashboard buffer if it's squatting in the window
   (when-let ((doom-buf (get-buffer "*doom*")))
     (when (eq doom-buf (window-buffer))
@@ -231,12 +249,22 @@ happens to be current."
 ;; Run early so it suppresses doom dashboard before it renders
 (add-hook 'doom-init-ui-hook #'workbench-cc--startup -90)
 
-;; Redraw on window resize
+;; Redraw on window resize (debounced)
+(defvar workbench-cc--resize-timer nil
+  "Debounce timer for command centre resize re-render.")
+
 (defun workbench-cc--on-resize (&optional _frame)
-  "Redraw if command centre is visible. Only needed for SVG (IC) view."
+  "Schedule a debounced redraw if command centre is visible."
   (when (and workbench-cc--data
              (eq workbench/command-centre-view 'ic)
              (get-buffer-window workbench-cc--buffer-name))
-    (workbench-cc--render workbench-cc--data)))
+    (when (timerp workbench-cc--resize-timer)
+      (cancel-timer workbench-cc--resize-timer))
+    (setq workbench-cc--resize-timer
+          (run-at-time 0.3 nil
+                       (lambda ()
+                         (setq workbench-cc--resize-timer nil)
+                         (when (get-buffer-window workbench-cc--buffer-name)
+                           (workbench-cc--render workbench-cc--data)))))))
 
 (add-hook 'window-size-change-functions #'workbench-cc--on-resize)

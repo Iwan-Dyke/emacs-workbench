@@ -5,6 +5,7 @@
 (require 'svg)
 
 (defvar workbench-cc--buffer-name)
+(defvar workbench-jira-wip-limit)
 
 (declare-function workbench-cc--error-p "command-centre-data")
 (declare-function workbench-cc--error-reason "command-centre-data")
@@ -122,7 +123,7 @@
            (tickets-error (workbench-cc--error-p tickets-raw))
            (tickets (if tickets-error '() tickets-raw))
            (wip-count (length tickets))
-           (wip-limit 9)
+           (wip-limit workbench-jira-wip-limit)
            (gauge-r (funcall s 42))
            (gauge-cx (+ pad gauge-r (funcall s 10)))
            (gauge-cy (+ y gauge-r))
@@ -187,7 +188,7 @@
                         :fill type-col :font-family "monospace")
               (svg-text svg (format "%s  %s" key
                                     (truncate-string-to-width summary
-                                      (/ (- w tx (funcall s 140)) (funcall s 8))))
+                                      (max 1 (/ (- w tx (funcall s 140)) (funcall s 8)))))
                         :x (+ tx (funcall s 24)) :y ty :font-size font-sm
                         :fill (if stale yellow fg) :font-family "monospace")
               ;; Days badge
@@ -203,7 +204,7 @@
                             :fill dim :font-family "monospace"))
                 (when comment
                   (svg-text svg (truncate-string-to-width comment
-                                  (/ (- w tx (funcall s 180)) (funcall s 7)))
+                                  (max 1 (/ (- w tx (funcall s 180)) (funcall s 7))))
                             :x (+ tx (funcall s (if parent 100 24))) :y ty2 :font-size font-xs
                             :fill dim :font-family "monospace")))
               (setq ty (+ ty (funcall s 42))))))
@@ -242,7 +243,7 @@
             (dolist (item next-items)
               (svg-text svg (format "%s  %s" (plist-get item :key)
                                     (truncate-string-to-width (plist-get item :summary)
-                                      (/ (- half-w (funcall s 80)) (funcall s 8))))
+                                      (max 1 (/ (- half-w (funcall s 80)) (funcall s 8)))))
                         :x pad :y ny :font-size font-sm
                         :fill fg :font-family "monospace")
               (setq ny (+ ny line-h)))))
@@ -261,7 +262,7 @@
             (dolist (item done-items)
               (svg-text svg (format "%s  %s" (plist-get item :key)
                                     (truncate-string-to-width (plist-get item :summary)
-                                      (/ (- half-w (funcall s 80)) (funcall s 8))))
+                                      (max 1 (/ (- half-w (funcall s 80)) (funcall s 8)))))
                         :x col2-x :y dy :font-size font-sm
                         :fill green :font-family "monospace")
               (setq dy (+ dy line-h)))))
@@ -313,7 +314,7 @@
         ;; Second line: last commit message
         (when (not (string-empty-p last-msg))
           (svg-text svg (truncate-string-to-width last-msg
-                          (/ (- w pad (funcall s 60)) (funcall s 7)))
+                          (max 1 (/ (- w pad (funcall s 60)) (funcall s 7))))
                     :x (+ pad (funcall s 16)) :y (+ y (funcall s 16)) :font-size font-xs
                     :fill dim :font-family "monospace"))
         (setq y (+ y (funcall s 36)))))
@@ -343,7 +344,7 @@
                     :x (+ pad (funcall s 110)) :y y :font-size font-xs
                     :fill accent :font-family "monospace")
           (svg-text svg (truncate-string-to-width (plist-get c :msg)
-                          (/ (- w (funcall s 320)) (funcall s 7)))
+                          (max 1 (/ (- w (funcall s 320)) (funcall s 7))))
                     :x (+ pad (funcall s 240)) :y y :font-size font-sm
                     :fill fg :font-family "monospace")
           (setq y (+ y line-h)))))

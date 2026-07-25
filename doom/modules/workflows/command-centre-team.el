@@ -5,6 +5,7 @@
 (require 'nerd-icons nil t)
 
 (defvar workbench-cc--buffer-name)
+(defvar workbench-cc--data)
 (defvar workbench-cc--team-wip-limit)
 (defvar workbench-cc--team-name)
 
@@ -40,11 +41,30 @@
           "\n"))
 
 (defun workbench-cc--open-ticket-at-point ()
-  "Open the Jira ticket at point in a browser."
+  "Open the Jira ticket at point in a browser.
+In team-lead (text) view, reads the ticket key from text properties.
+In IC (SVG) view, text properties are not available — prompts for the key
+from the cached ticket list instead."
   (interactive)
-  (when-let ((key (get-text-property (point) 'workbench-cc-ticket-key)))
-    (start-process "jira-open" nil "jira" "open" key)
-    (message "Opening %s..." key)))
+  (if-let ((key (get-text-property (point) 'workbench-cc-ticket-key)))
+      (progn
+        (start-process "jira-open" nil "jira" "open" key)
+        (message "Opening %s..." key))
+    ;; No text property (IC/SVG view) — offer ticket selection from cached data
+    (if (and workbench-cc--data
+             (plist-get workbench-cc--data :tickets)
+             (not (workbench-cc--error-p (plist-get workbench-cc--data :tickets))))
+        (let* ((tickets (plist-get workbench-cc--data :tickets))
+               (choices (mapcar (lambda (tkt)
+                                  (format "%s  %s"
+                                          (plist-get tkt :key)
+                                          (plist-get tkt :summary)))
+                                tickets))
+               (selection (completing-read "Open ticket: " choices nil t))
+               (selected-key (car (split-string selection " " t))))
+          (start-process "jira-open" nil "jira" "open" selected-key)
+          (message "Opening %s..." selected-key))
+      (user-error "No tickets available. Refresh with R"))))
 
 ;;; ── Team Lead Renderer ─────────────────────────────────────────────────────
 

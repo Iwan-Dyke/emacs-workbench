@@ -3,6 +3,8 @@
 ;; Data collection for the command centre: git/repo status, infra checks,
 ;; team data collection. Jira data comes from modules/tools/jira.el (ADR 0064).
 
+(require 'seq)
+
 ;;; ── Compatibility aliases ──────────────────────────────────────────────────
 ;; The command centre SVG and team renderers reference these names.
 ;; They now delegate to the shared Jira module.
@@ -104,11 +106,12 @@
                          (concat "--author=" workbench-cc--git-author) "--since=3 days ago"
                          "--format=%ct|%ar|%s")))
         (dolist (line lines)
-          (let ((parts (split-string line "|" nil)))
-            (push (list :epoch (string-to-number (or (nth 0 parts) "0"))
+          ;; Split on only the first two pipes — the message may contain pipes
+          (when (string-match "\\([^|]+\\)|\\([^|]+\\)|\\(.*\\)" line)
+            (push (list :epoch (string-to-number (match-string 1 line))
                         :repo (file-name-nondirectory dir)
-                        :time (or (nth 1 parts) "")
-                        :msg (or (nth 2 parts) ""))
+                        :time (match-string 2 line)
+                        :msg (match-string 3 line))
                   all)))))
     (seq-take (sort all (lambda (a b)
                           (> (plist-get a :epoch) (plist-get b :epoch))))
@@ -185,13 +188,16 @@ Returns items sorted by urgency: stale first, then no-recent-comment."
              (key (plist-get tkt :key))
              (assignee (plist-get tkt :assignee)))
         (cond
-         ((and days (> days 14))
+         ;; Nil days means unparseable date (e.g. "2 hours ago") — recently
+         ;; updated, so skip without flagging.
+         ((null days) nil)
+         ((> days 14)
           (push (list :key key :assignee assignee :days days
                       :reason "two-week rule") items))
-         ((and days (> days 7))
+         ((> days 7)
           (push (list :key key :assignee assignee :days days
                       :reason "no update 7+ days") items))
-         ((and days (> days 3))
+         ((> days 3)
           (push (list :key key :assignee assignee :days days
                       :reason "may need check-in") items)))))
     (sort items (lambda (a b)
@@ -200,7 +206,9 @@ Returns items sorted by urgency: stale first, then no-recent-comment."
 
 (defun workbench-cc--collect-team-lead ()
   "Collect all data for the team lead command centre view.
-Ticket fields may contain (:error REASON) instead of a list when fetch fails."
+Ticket fields may contain (:error REASON) instead of a list when fetch fails.
+Also fetches personal In Progress tickets (via :tickets) so the shared Jira
+cache can be populated for org agenda sync."
   (let* ((wip-raw (workbench-cc--team-tickets-by-status workbench-cc--team-status-wip))
          (wip (if (workbench-cc--error-p wip-raw)
                   wip-raw
@@ -216,10 +224,13 @@ Ticket fields may contain (:error REASON) instead of a list when fetch fails."
          (done (if (workbench-cc--error-p done-raw) done-raw (seq-take done-raw 5)))
          (attention (if (workbench-cc--error-p wip)
                         nil
-                      (workbench-cc--team-attention-items wip))))
+                      (workbench-cc--team-attention-items wip)))
+         ;; Also fetch personal tickets for the shared Jira cache (org agenda)
+         (personal-tickets (workbench-cc--jira-tickets)))
     (list :wip wip
           :next next
           :done done
+          :tickets personal-tickets
           :attention attention
           :infra (workbench-cc--infra-status)
           :time (format-time-string "%A %d %B, %H:%M"))))
