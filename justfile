@@ -16,7 +16,21 @@ check:
     ./bin/doctor
 
 test:
-    emacs --batch --no-init-file -l ert -l test/workbench-test.el -f ert-run-tests-batch-and-exit
+    emacs --batch --no-init-file -L test -l ert -l test-helper \
+      -l test/unit/test-core.el \
+      -l test/unit/test-jira.el \
+      -l test/unit/test-terminals.el \
+      -l test/unit/test-git.el \
+      -l test/unit/test-files.el \
+      -l test/unit/test-coding.el \
+      -l test/unit/test-session.el \
+      -l test/unit/test-ai.el \
+      -l test/unit/test-org.el \
+      -l test/unit/test-dashboard.el \
+      -l test/unit/test-mermaid.el \
+      -l test/unit/test-bugs.el \
+      -l test/unit/test-workflow-bugs.el \
+      -f ert-run-tests-batch-and-exit
 
 workbench profile="personal":
     ./bin/workbench {{profile}}
