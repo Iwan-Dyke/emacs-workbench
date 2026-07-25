@@ -32,6 +32,13 @@ test:
       -l test/unit/test-workflow-bugs.el \
       -f ert-run-tests-batch-and-exit
 
+test-behaviour profile="work":
+    ./test/run-behaviour-tests.sh {{profile}}
+
+test-all:
+    just test
+    just test-behaviour work
+
 workbench profile="personal":
     ./bin/workbench {{profile}}
 
