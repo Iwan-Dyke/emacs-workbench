@@ -2,6 +2,7 @@
 
 (require 'seq)
 (declare-function workbench--project-root "modules/tools/files")
+(declare-function workbench--treemacs-window "modules/system/interface")
 
 ;; Two AI scopes (ADR 0034). Global/session agents run full-window in the "ai"
 ;; workspace; project AI panes dock on the far right of a coding layout
@@ -32,14 +33,28 @@ If the buffer exists but the process is dead, kills and relaunches it."
        ;; Dead buffer — kill and relaunch
        (buf
         (kill-buffer buf)
-        (vterm buffer-name)
-        (vterm-send-string (workbench--ai-command tool))
-        (vterm-send-return))
+        (let ((new-buf (vterm buffer-name)))
+          (workbench--vterm-resize new-buf (selected-window))
+          (let ((b new-buf) (w (selected-window)) (cmd (workbench--ai-command tool)))
+            (run-at-time 0.05 nil
+                         (lambda ()
+                           (when (and (buffer-live-p b) (window-live-p w))
+                             (with-current-buffer b
+                               (workbench--vterm-resize b w)
+                               (vterm-send-string cmd)
+                               (vterm-send-return))))))))
        ;; No buffer — create fresh
        (t
-        (vterm buffer-name)
-        (vterm-send-string (workbench--ai-command tool))
-        (vterm-send-return))))
+        (let ((new-buf (vterm buffer-name)))
+          (workbench--vterm-resize new-buf (selected-window))
+          (let ((b new-buf) (w (selected-window)) (cmd (workbench--ai-command tool)))
+            (run-at-time 0.05 nil
+                         (lambda ()
+                           (when (and (buffer-live-p b) (window-live-p w))
+                             (with-current-buffer b
+                               (workbench--vterm-resize b w)
+                               (vterm-send-string cmd)
+                               (vterm-send-return))))))))))
     (delete-other-windows)))
 
 (defun workbench/open-default-ai-workspace ()
@@ -52,18 +67,33 @@ If the buffer exists but the process is dead, kills and relaunches it."
 ;; workspaces doesn't bleed context between projects.
 
 (defvar workbench-project-ai-width 0.30
-  "Width of the project AI pane as a fraction of the frame (ADR 0048).")
+  "Width of the project AI pane as a fraction of the *available* editing area.
+This fraction is applied to the frame width minus any side windows (e.g.
+Treemacs), so the code buffer keeps a consistent proportion regardless of
+whether the project tree is open.")
+
+(defun workbench--ai-pane-window-width ()
+  "Compute the AI pane width in columns, accounting for side windows.
+Returns a column count (integer) so `display-buffer' doesn't miscalculate
+when Treemacs is consuming part of the frame."
+  (let* ((frame-cols (frame-width))
+         (tree-cols (if-let ((tw (workbench--treemacs-window)))
+                       (window-total-width tw)
+                     0))
+         (available (- frame-cols tree-cols)))
+    (max 40 (round (* available workbench-project-ai-width)))))
 
 (defun workbench--project-ai-buffer-name (tool)
   "Return the project AI buffer name for TOOL scoped to the current workspace."
   (format "*project-%s:%s*" tool (+workspace-current-name)))
 
 (defun workbench--project-ai-window ()
-  "Return a visible window showing any project AI buffer for this workspace, or nil."
+  "Return a visible window showing any project AI buffer for this workspace, or nil.
+Only searches the selected frame to avoid affecting panes on other frames."
   (let ((ws (+workspace-current-name)))
     (seq-some (lambda (tool)
                 (when-let ((buffer (get-buffer (format "*project-%s:%s*" tool ws))))
-                  (get-buffer-window buffer)))
+                  (get-buffer-window buffer (selected-frame))))
               '("codex" "kiro" "claude"))))
 
 (defun workbench--show-project-ai (tool)
@@ -76,27 +106,41 @@ Launches at the project root so the agent sees the whole project."
          (command (workbench--ai-command tool))
          (existing (get-buffer buffer-name))
          (default-directory (workbench--project-root))
-         (buffer (or existing (get-buffer-create buffer-name)))
+         ;; Detect dead buffer BEFORE display — kill and recreate so we
+         ;; never show a dead buffer in the window.
+         (buffer (cond
+                  ((and existing (get-buffer-process existing)) existing)
+                  (existing
+                   (kill-buffer existing)
+                   (get-buffer-create buffer-name))
+                  (t (get-buffer-create buffer-name))))
+         (needs-launch (not (and existing (get-buffer-process existing))))
          (window (display-buffer
                   buffer
                   `((display-buffer-in-direction)
                     (direction . right)
-                    (window . root)
-                    (window-width . ,workbench-project-ai-width)))))
+                    (window . main)
+                    (window-width . ,(workbench--ai-pane-window-width))))))
     (select-window window)
-    (if existing
+    (if (not needs-launch)
         (workbench--vterm-resize buffer window)
-      (with-current-buffer buffer
-        (vterm-mode)
-        (workbench--vterm-resize buffer window)
-        (vterm-send-string command)
-        (vterm-send-return)
-        ;; CLI tools (kiro-cli, claude) take variable time to initialize.
-        ;; A single delayed resize often fires before the child process is
-        ;; ready to receive SIGWINCH. Use staggered timers to catch the
-        ;; process at whatever stage it becomes responsive, plus a
-        ;; process-output hook for the earliest reliable moment.
-        (workbench--schedule-ai-pane-resizes buffer window)))))
+      (let ((root (workbench--project-root)))
+        (with-current-buffer buffer
+          (setq default-directory root)
+          (vterm-mode)
+          (workbench--vterm-resize buffer window)
+          ;; Delay command send until vterm has processed the resize. Without
+          ;; this, the CLI tool can start rendering at the default 80-col pty
+          ;; width before our resize takes effect, causing text to be cut off.
+          (let ((buf buffer) (win window) (cmd command))
+            (run-at-time 0.05 nil
+                         (lambda ()
+                           (when (and (buffer-live-p buf) (window-live-p win))
+                             (with-current-buffer buf
+                               (workbench--vterm-resize buf win)
+                               (vterm-send-string cmd)
+                               (vterm-send-return))))))
+          (workbench--schedule-ai-pane-resizes buffer window))))))
 
 
 (defvar-local workbench--ai-pane-resize-timer nil
@@ -169,7 +213,7 @@ Uses buffer-local variables to find the target window and state."
   "Toggle TOOL as the project AI pane for the current workspace."
   (let* ((buffer-name (workbench--project-ai-buffer-name tool))
          (window (and (get-buffer buffer-name)
-                      (get-buffer-window buffer-name))))
+                      (get-buffer-window buffer-name (selected-frame)))))
     (if window
         (delete-window window)
       (workbench--show-project-ai tool))))
