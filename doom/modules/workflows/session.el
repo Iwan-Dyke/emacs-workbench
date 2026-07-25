@@ -24,23 +24,31 @@
 (defun workbench/open-startup-workspaces ()
   "Open the startup workspaces: agenda, AI agent, and files browser.
 Order: dashboard → agenda → ai → files (ADR 0042, ADR 0065).
-Leaves the original (dashboard) workspace selected."
+Leaves the original (dashboard) workspace selected.
+Each step is wrapped in condition-case so a failure in one workspace
+(e.g. vterm unavailable for AI) doesn't prevent the others from being created."
   (interactive)
   (unless (and (fboundp '+workspace-switch)
                (fboundp '+workspace-current-name))
     (user-error "Doom workspaces are not available"))
   (let ((starting-workspace (+workspace-current-name)))
     ;; Agenda workspace
-    (+workspace-switch "agenda" t)
-    (when (fboundp 'workbench-org/open-agenda)
-      (condition-case nil
-          (workbench-org/open-agenda)
-        (error nil)))
+    (condition-case nil
+        (progn
+          (+workspace-switch "agenda" t)
+          (when (fboundp 'workbench-org/open-agenda)
+            (workbench-org/open-agenda)))
+      (error nil))
     ;; AI workspace
-    (workbench/open-default-ai-workspace)
+    (condition-case nil
+        (workbench/open-default-ai-workspace)
+      (error nil))
     ;; Files workspace
-    (+workspace-switch "files" t)
-    (workbench/open-files)
+    (condition-case nil
+        (progn
+          (+workspace-switch "files" t)
+          (workbench/open-files))
+      (error nil))
     ;; Return to dashboard
     (+workspace-switch starting-workspace t)
     (+workspace/display)))
