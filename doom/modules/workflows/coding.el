@@ -27,6 +27,10 @@ appends a numeric suffix (e.g. utils<2>)."
   "Hash table mapping workspace name → project directory (truename).
 Used as a fallback when the dashboard buffer has been killed.")
 
+(defvar workbench--suppress-initial-dashboard nil
+  "When non-nil, `open-project-workspace' skips the initial dashboard.
+Set by `open-project-workspace-full-layout' which renders its own layout.")
+
 (defun workbench/open-project-workspace (directory)
   "Open DIRECTORY as a workbench project workspace.
 If a workspace with the directory's name already exists AND belongs to the
@@ -51,7 +55,8 @@ collides)."
           (setq default-directory project-directory)
           (puthash workspace-name (file-name-as-directory project-directory)
                    workbench--workspace-directories)
-          (workbench/open-project-dashboard project-directory))))))
+          (unless workbench--suppress-initial-dashboard
+            (workbench/open-project-dashboard project-directory)))))))
 
 (defun workbench--find-workspace-for-directory (base directory)
   "Find an existing workspace for DIRECTORY, checking BASE and BASE<N> variants.
@@ -125,9 +130,12 @@ This is the one-shot equivalent of: SPC p o → SPC e → SPC t c/k."
                        (workbench--project-directory-for-path
                         (workbench--selected-path))
                      (read-directory-name "Project directory: "))))
-    (workbench/open-project-workspace directory)
-    ;; Step 2: clear any existing layout and build fresh
-    (delete-other-windows)
+    (let ((workbench--suppress-initial-dashboard t))
+      (workbench/open-project-workspace directory))
+    ;; Step 2: clear any existing layout and build fresh.
+    ;; ignore-window-parameters ensures side windows (treemacs) are also removed.
+    (let ((ignore-window-parameters t))
+      (delete-other-windows))
     ;; Step 3: open Treemacs on the left
     (workbench--treemacs-display directory)
     ;; Step 4: select the main editing window (right of Treemacs)
