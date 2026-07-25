@@ -59,6 +59,7 @@ When TICKETS is an error plist, refuses to write to avoid wiping valid content."
         (message "workbench-org: skipping jira.org write — fetch returned an error")
         nil)
     (let* ((file (workbench-org--jira-file))
+           (dir (file-name-directory file))
            (content (concat "#+title: Jira — In Progress\n"
                             "#+filetags: :jira:generated:\n\n"
                             (if (null tickets)
@@ -69,6 +70,7 @@ When TICKETS is an error plist, refuses to write to avoid wiping valid content."
                          (insert-file-contents file)
                          (buffer-string)))))
       (unless (equal content existing)
+        (make-directory dir t)
         (with-temp-file file
           (insert content))))))
 
@@ -183,10 +185,13 @@ When called from the refresh hook, the cache is already fresh."
 
 (defun workbench-org-discover-adrs ()
   "Scan repos for ADRs and create/update org-roam nodes.
-Creates one org file per repo in ~/org/projects/ containing ADR nodes."
+Creates one org file per repo in ~/org/projects/ containing ADR nodes.
+Only rewrites files whose content has changed, and only triggers
+org-roam-db-sync when at least one file was updated."
   (interactive)
   (let ((repos (workbench-org--adr-repos))
-        (total 0))
+        (total 0)
+        (changed 0))
     (dolist (repo repos)
       (let* ((repo-name (file-name-nondirectory repo))
              (adr-files (workbench-org--adr-files repo))
@@ -209,16 +214,23 @@ Creates one org file per repo in ~/org/projects/ containing ADR nodes."
                   entries)
             (cl-incf total)))
         (when entries
-          ;; Ensure projects/ directory exists
           (make-directory (file-name-directory org-file) t)
-          (with-temp-file org-file
-            (insert "#+title: " repo-name " — ADRs\n"
-                    "#+filetags: :adr:" repo-name ":\n\n"
-                    (mapconcat #'identity (nreverse entries) "\n"))))))
-    ;; Rebuild roam DB to pick up new nodes
-    (when (and (> total 0) (fboundp 'org-roam-db-sync))
+          (let ((content (concat "#+title: " repo-name " — ADRs\n"
+                                 "#+filetags: :adr:" repo-name ":\n\n"
+                                 (mapconcat #'identity (nreverse entries) "\n")))
+                (existing (when (file-exists-p org-file)
+                            (with-temp-buffer
+                              (insert-file-contents org-file)
+                              (buffer-string)))))
+            (unless (equal content existing)
+              (with-temp-file org-file
+                (insert content))
+              (cl-incf changed))))))
+    ;; Only rebuild roam DB if content actually changed
+    (when (and (> changed 0) (fboundp 'org-roam-db-sync))
       (org-roam-db-sync))
-    (message "ADR discovery: found %d ADRs across %d repos" total (length repos))))
+    (message "ADR discovery: found %d ADRs across %d repos (%d files updated)"
+             total (length repos) changed)))
 
 ;;; ── Open Agenda ────────────────────────────────────────────────────────────
 

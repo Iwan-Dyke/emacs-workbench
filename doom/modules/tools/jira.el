@@ -264,14 +264,25 @@ Consumers (command centre, org) add functions here to react to new data.")
 
 (defun workbench-jira-refresh-sync ()
   "Refresh the Jira cache synchronously and run hooks.
-Use this for callers that need blocking behaviour (e.g. first-call cache population)."
+Use this for callers that need blocking behaviour (e.g. first-call cache population).
+Accepts partial results — only stores keys that succeeded."
   (interactive)
-  (let ((result (list :tickets (workbench-jira--fetch-tickets)
-                      :done (workbench-jira--fetch-done)
-                      :next (workbench-jira--fetch-next))))
-    (unless (or (workbench-jira-error-p (plist-get result :tickets))
-                (workbench-jira-error-p (plist-get result :done))
-                (workbench-jira-error-p (plist-get result :next)))
+  (let* ((tickets (workbench-jira--fetch-tickets))
+         (done (workbench-jira--fetch-done))
+         (next (workbench-jira--fetch-next))
+         (result (list :tickets (if (workbench-jira-error-p tickets)
+                                    (plist-get workbench-jira--cache :tickets)
+                                  tickets)
+                       :done (if (workbench-jira-error-p done)
+                                 (plist-get workbench-jira--cache :done)
+                               done)
+                       :next (if (workbench-jira-error-p next)
+                                 (plist-get workbench-jira--cache :next)
+                               next))))
+    ;; Update cache if at least one fetch succeeded
+    (when (or (not (workbench-jira-error-p tickets))
+              (not (workbench-jira-error-p done))
+              (not (workbench-jira-error-p next)))
       (setq workbench-jira--cache result)
       (setq workbench-jira--cache-time (current-time))
       (run-hooks 'workbench-jira-after-refresh-hook))))
@@ -324,15 +335,17 @@ the result. Parses output in the sentinel callback."
                       (setq workbench-jira--async-timeout nil))
                     (let ((result nil))
                       (if (zerop (process-exit-status process))
-                          (with-current-buffer (process-buffer process)
-                            (goto-char (point-min))
-                            (condition-case nil
-                                (setq result (read (current-buffer)))
-                              (error
-                               (message "Jira refresh: failed to parse fetch result"))))
+                          (when (buffer-live-p (process-buffer process))
+                            (with-current-buffer (process-buffer process)
+                              (goto-char (point-min))
+                              (condition-case nil
+                                  (setq result (read (current-buffer)))
+                                (error
+                                 (message "Jira refresh: failed to parse fetch result")))))
                         (message "Jira refresh: process exited %d"
                                  (process-exit-status process)))
-                      (kill-buffer (process-buffer process))
+                      (when (buffer-live-p (process-buffer process))
+                        (kill-buffer (process-buffer process)))
                       (when (eq workbench-jira--async-process process)
                         (setq workbench-jira--async-process nil))
                       (when result

@@ -63,7 +63,10 @@ Each step is wrapped in condition-case so a failure in one workspace
     (condition-case err
         (progn
           (workbench/open-startup-workspaces)
-          (setq workbench--startup-workspaces-opened t))
+          (setq workbench--startup-workspaces-opened t)
+          ;; Remove self from the hook — no longer needed.
+          (remove-hook 'server-after-make-frame-hook
+                       #'workbench--open-startup-workspaces-on-frame))
       (error
        (message "Workbench startup workspaces failed: %s"
                 (error-message-string err))))))

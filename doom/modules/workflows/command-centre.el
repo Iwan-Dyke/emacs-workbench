@@ -82,15 +82,17 @@ failure. Kills the child process after 60 seconds if it hangs."
                       (setq workbench-cc--async-timeout nil))
                     (let ((result nil))
                       (if (zerop (process-exit-status process))
-                          (with-current-buffer (process-buffer process)
-                            (goto-char (point-min))
-                            (condition-case nil
-                                (setq result (read (current-buffer)))
-                              (error
-                               (message "Command centre: failed to parse fetch result"))))
+                          (when (buffer-live-p (process-buffer process))
+                            (with-current-buffer (process-buffer process)
+                              (goto-char (point-min))
+                              (condition-case nil
+                                  (setq result (read (current-buffer)))
+                                (error
+                                 (message "Command centre: failed to parse fetch result")))))
                         (message "Command centre: fetch process exited %d"
                                  (process-exit-status process)))
-                      (kill-buffer (process-buffer process))
+                      (when (buffer-live-p (process-buffer process))
+                        (kill-buffer (process-buffer process)))
                       (when (eq workbench-cc--async-process process)
                         (setq workbench-cc--async-process nil))
                       (funcall callback result)))))))
@@ -104,29 +106,45 @@ failure. Kills the child process after 60 seconds if it hangs."
                            (message "Command centre: fetch timed out after 60s")
                            (delete-process proc)))))))
 
+(defvar workbench-cc--fetch-failure-count 0
+  "Count of consecutive CC fetch failures. Used to re-enable Jira timer fallback.")
+
 (defun workbench-cc-refresh ()
   "Refetch data asynchronously and refresh the command centre dashboard."
   (interactive)
   (message "Command centre: fetching...")
   (workbench-cc--async-collect
    (lambda (data)
-     (when data
-       (setq workbench-cc--data data)
-       ;; Populate the shared Jira cache from CC data so org module stays in sync.
-       ;; IC view returns :tickets (personal), team-lead returns :wip (team).
-       ;; For the shared cache (used by org agenda), we need personal tickets.
-       ;; Only populate if the data contains :tickets (IC view); team-lead view
-       ;; doesn't fetch personal tickets so we must not overwrite with nil.
-       (let ((tickets (plist-get data :tickets)))
-         (when (and tickets (not (workbench-jira-error-p tickets)))
-           (setq workbench-jira--cache
-                 (list :tickets tickets
-                       :done (plist-get data :done)
-                       :next (plist-get data :next)))
-           (setq workbench-jira--cache-time (current-time))
-           (run-hooks 'workbench-jira-after-refresh-hook)))
-       (workbench-cc--render-current)
-       (message "Command centre: refreshed")))))
+     (if data
+         (progn
+           (setq workbench-cc--fetch-failure-count 0)
+           (setq workbench-cc--data data)
+           ;; Populate the shared Jira cache from CC data so org module stays in sync.
+           ;; IC view returns :tickets (personal), team-lead returns :wip (team).
+           ;; For the shared cache (used by org agenda), we need personal tickets.
+           ;; Only populate if the data contains :tickets (IC view); team-lead view
+           ;; doesn't fetch personal tickets so we must not overwrite with nil.
+           (let ((tickets (plist-get data :tickets)))
+             (when (and tickets (not (workbench-jira-error-p tickets)))
+               (setq workbench-jira--cache
+                     (list :tickets tickets
+                           :done (plist-get data :done)
+                           :next (plist-get data :next)))
+               (setq workbench-jira--cache-time (current-time))
+               (run-hooks 'workbench-jira-after-refresh-hook)))
+           (when (buffer-live-p (get-buffer workbench-cc--buffer-name))
+             (workbench-cc--render-current))
+           (message "Command centre: refreshed"))
+       ;; Fetch failed (nil result)
+       (cl-incf workbench-cc--fetch-failure-count)
+       (message "Command centre: fetch failed (%d consecutive)"
+                workbench-cc--fetch-failure-count)
+       ;; After 3 consecutive failures, re-enable the Jira timer as a fallback
+       ;; so the shared cache doesn't go permanently stale.
+       (when (and (>= workbench-cc--fetch-failure-count 3)
+                  (not workbench-jira--timer))
+         (message "Command centre: enabling Jira timer fallback")
+         (workbench-jira-start-timer))))))
 
 (defun workbench-cc-refresh-sync ()
   "Refetch data synchronously (blocking). Use for startup or debugging."
