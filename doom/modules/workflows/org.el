@@ -52,21 +52,33 @@
             ":END:\n")))
 
 (defun workbench-org--write-jira-file (tickets)
-  "Write TICKETS to jira.org. Replaces file content entirely."
-  (let ((file (workbench-org--jira-file))
-        (content (concat "#+title: Jira — In Progress\n"
-                         "#+filetags: :jira:generated:\n\n"
-                         (if (or (null tickets)
-                                 (workbench-jira-error-p tickets))
-                             "No tickets loaded.\n"
-                           (mapconcat #'workbench-org--format-ticket tickets "\n")))))
-    (with-temp-file file
-      (insert content))))
+  "Write TICKETS to jira.org. Only writes if content has changed.
+When TICKETS is an error plist, refuses to write to avoid wiping valid content."
+  (if (workbench-jira-error-p tickets)
+      (progn
+        (message "workbench-org: skipping jira.org write — fetch returned an error")
+        nil)
+    (let* ((file (workbench-org--jira-file))
+           (content (concat "#+title: Jira — In Progress\n"
+                            "#+filetags: :jira:generated:\n\n"
+                            (if (null tickets)
+                                "No tickets loaded.\n"
+                              (mapconcat #'workbench-org--format-ticket tickets "\n"))))
+           (existing (when (file-exists-p file)
+                       (with-temp-buffer
+                         (insert-file-contents file)
+                         (buffer-string)))))
+      (unless (equal content existing)
+        (with-temp-file file
+          (insert content))))))
 
 (defun workbench-org-sync-jira ()
-  "Sync In Progress tickets from the shared Jira cache to jira.org."
+  "Sync In Progress tickets from the shared Jira cache to jira.org.
+When called interactively, ensures the cache is populated first.
+When called from the refresh hook, the cache is already fresh."
   (interactive)
-  (workbench-jira-ensure-cache)
+  (when (called-interactively-p 'any)
+    (workbench-jira-ensure-cache))
   (let ((tickets (workbench-jira-cache-tickets)))
     (workbench-org--write-jira-file tickets)))
 
@@ -75,35 +87,16 @@
 
 ;;; ── Agenda Views ───────────────────────────────────────────────────────────
 
-(after! org
-  (setq org-agenda-custom-commands
-        '(("d" "Today — In Progress + scheduled"
-           ((todo "TODO"
-                  ((org-agenda-overriding-header "In Progress (Jira)")
-                   (org-agenda-files (list (expand-file-name "jira.org" org-directory)))))
-            (agenda ""
-                    ((org-agenda-span 'day)
-                     (org-agenda-overriding-header "Scheduled Today")))))
-          ("s" "Stale — no update 14+ days"
-           ((todo "TODO"
-                  ((org-agenda-overriding-header "Stale Items (14+ days)")
-                   (org-agenda-files (list (expand-file-name "jira.org" org-directory)))
-                   (org-agenda-skip-function
-                    '(org-agenda-skip-entry-if 'notregexp "UPDATED:.*"))))))
-          ("i" "Inbox — uncategorised"
-           ((alltodo ""
-                     ((org-agenda-overriding-header "Inbox")
-                      (org-agenda-files (list (expand-file-name "inbox.org" org-directory))))))))))
-
 ;; The stale view needs a custom skip function that checks UPDATED property.
 ;; This is a simple approach — if the UPDATED value is within 14 days, skip it.
 (defun workbench-org--stale-skip ()
-  "Skip entry if UPDATED property is within 14 days."
+  "Skip entry if UPDATED property is within 14 days or unparseable."
   (let ((updated (org-entry-get nil "UPDATED")))
-    (if (and updated
-             (let ((days (workbench-jira-days-since-update updated)))
-               (and days (< days 14))))
-        (org-end-of-subtree t)
+    (if updated
+        (let ((days (workbench-jira-days-since-update updated)))
+          (if (or (null days) (< days 14))
+              (org-end-of-subtree t)
+            nil))
       nil)))
 
 (after! org
