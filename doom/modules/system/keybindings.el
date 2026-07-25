@@ -38,7 +38,8 @@
        :desc "Open file manager (Dirvish)" "m" #'workbench/open-files)
 
       (:prefix ("p" . "projects")
-       :desc "Open project workspace" "o" #'workbench/open-project-workspace-dwim))
+       :desc "Open project workspace" "o" #'workbench/open-project-workspace-full-layout
+       :desc "Open project (no layout)" "O" #'workbench/open-project-workspace-dwim))
 
 (map! :nvm "C-h" #'workbench/window-left
       :nvm "C-j" #'evil-window-down

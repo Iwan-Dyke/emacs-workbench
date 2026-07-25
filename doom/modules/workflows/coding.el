@@ -1,7 +1,12 @@
 ;;; workflows/coding.el -*- lexical-binding: t; -*-
 
 (declare-function workbench--directory-name "modules/tools/files")
+(declare-function workbench--selected-path "modules/tools/files")
+(declare-function workbench--project-directory-for-path "modules/tools/files")
 (declare-function workbench/open-selected-path-as-project-workspace "modules/tools/files")
+(declare-function workbench--treemacs-display "modules/tools/files")
+(declare-function workbench/open-project-dashboard "modules/workflows/project-dashboard")
+(declare-function workbench--show-project-ai "modules/workflows/ai")
 
 (defun workbench--project-identity-name (directory)
   "Return a workspace name for DIRECTORY: the bare directory name.
@@ -104,3 +109,30 @@ workspace switch."
   (if (derived-mode-p 'dired-mode)
       (workbench/open-selected-path-as-project-workspace)
     (call-interactively #'workbench/open-project-workspace)))
+
+(defun workbench/open-project-workspace-full-layout ()
+  "Open a project workspace with the full coding layout: Treemacs | Code | AI.
+From Dired/Dirvish, uses the selected path. Otherwise prompts.
+Creates or switches to the workspace, then builds the three-pane layout:
+  - Treemacs tree on the left (project root)
+  - Project dashboard in the centre
+  - Profile default AI pane on the right
+
+This is the one-shot equivalent of: SPC p o → SPC e → SPC t c/k."
+  (interactive)
+  ;; Step 1: open or switch to the workspace (reuses existing logic)
+  (let ((directory (if (derived-mode-p 'dired-mode)
+                       (workbench--project-directory-for-path
+                        (workbench--selected-path))
+                     (read-directory-name "Project directory: "))))
+    (workbench/open-project-workspace directory)
+    ;; Step 2: clear any existing layout and build fresh
+    (delete-other-windows)
+    ;; Step 3: open Treemacs on the left
+    (workbench--treemacs-display directory)
+    ;; Step 4: select the main editing window (right of Treemacs)
+    (other-window 1)
+    ;; Step 5: show the project dashboard in the centre
+    (workbench/open-project-dashboard directory)
+    ;; Step 6: open the AI pane on the right
+    (workbench--show-project-ai workbench/default-ai-tool)))
