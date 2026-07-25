@@ -104,7 +104,7 @@ Excludes Dirvish's parent and preview panes, which are also `dired-mode'."
          (and (not (string-prefix-p " " name))
               (not (string-match-p "\\*dirvish-" name))))))
 
-(defvar workbench--files-track-timer nil
+(defvar-local workbench--files-track-timer nil
   "Idle timer for debouncing files workspace position tracking.")
 
 (defun workbench--files-track-point ()

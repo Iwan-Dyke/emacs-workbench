@@ -92,14 +92,14 @@ When called from the refresh hook, the cache is already fresh."
 ;; The stale view needs a custom skip function that checks UPDATED property.
 ;; This is a simple approach — if the UPDATED value is within 14 days, skip it.
 (defun workbench-org--stale-skip ()
-  "Skip entry if UPDATED property is within 14 days or unparseable."
+  "Skip entry if UPDATED property is within 14 days, unparseable, or missing."
   (let ((updated (org-entry-get nil "UPDATED")))
     (if updated
         (let ((days (workbench-jira-days-since-update updated)))
           (if (or (null days) (< days 14))
-              (org-end-of-subtree t)
-            nil))
-      nil)))
+              (org-end-of-subtree t)  ; skip: unknown age or recently updated
+            nil))  ; don't skip: genuinely stale
+      (org-end-of-subtree t))))
 
 (after! org
   (setq org-agenda-custom-commands
