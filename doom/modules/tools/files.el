@@ -35,7 +35,12 @@ entry, passing back the directory and file it remembered; see
   (interactive)
   (delete-other-windows)
   (dired (or directory (workbench--project-root)))
-  (when (fboundp 'dirvish-layout-toggle)
+  (when (and (fboundp 'dirvish-layout-toggle)
+             (fboundp 'dirvish-curr)
+             (dirvish-curr)
+             ;; Only toggle layout ON — skip if already active.
+             (not (and (fboundp 'dv-curr-layout)
+                       (dv-curr-layout (dirvish-curr)))))
     (dirvish-layout-toggle))
   (when (and file (file-exists-p file))
     (dired-goto-file file)))
@@ -86,6 +91,10 @@ current project (or `default-directory') and focuses it."
     (if window
         (delete-window window)
       (workbench--treemacs-display (workbench--project-root)))))
+
+(after! (dired evil)
+  (evil-define-key 'normal dired-mode-map
+    "r" #'revert-buffer))
 
 (after! treemacs
   ;; Unlock the tree's width so it can be resized like any other window
