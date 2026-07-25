@@ -118,6 +118,9 @@ failure. Kills the child process after 60 seconds if it hangs."
      (if data
          (progn
            (setq workbench-cc--fetch-failure-count 0)
+           ;; If the jira timer was started as a fallback, stop it — CC is healthy again.
+           (when workbench-jira--timer
+             (workbench-jira-stop-timer))
            (setq workbench-cc--data data)
            ;; Populate the shared Jira cache from CC data so org module stays in sync.
            ;; IC view returns :tickets (personal), team-lead returns :wip (team).
