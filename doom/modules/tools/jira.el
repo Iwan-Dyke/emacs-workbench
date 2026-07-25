@@ -4,6 +4,8 @@
 ;; Provides config variables, shell helpers, data fetching with caching,
 ;; and a single refresh timer. Both command centre and org consume this.
 
+(require 'seq)
+
 ;;; ── Config ─────────────────────────────────────────────────────────────────
 
 (defvar workbench-jira-project nil
@@ -16,6 +18,10 @@
   "Root directory to scan for git repositories.")
 (defvar workbench-jira-spark-url "http://localhost:8888"
   "URL to health-check the local Spark environment.")
+
+;; Board config
+(defvar workbench-jira-wip-limit 9
+  "Total board WIP limit (all teams combined).")
 
 ;; Team config
 (defvar workbench-jira-team-name nil
@@ -95,7 +101,7 @@
           (if (string-empty-p output)
               '()
             (mapcar (lambda (line)
-                      (let ((parts (split-string line "\t+" nil)))
+                      (let ((parts (split-string line "\t")))
                         (list :key (string-trim (or (nth 0 parts) ""))
                               :summary (string-trim (or (nth 1 parts) ""))
                               :type (string-trim (or (nth 2 parts) ""))
@@ -120,7 +126,7 @@
               '()
             (seq-take
              (mapcar (lambda (line)
-                       (let ((parts (split-string line "\t+" nil)))
+                       (let ((parts (split-string line "\t")))
                          (list :key (string-trim (or (nth 0 parts) ""))
                                :summary (string-trim (or (nth 1 parts) "")))))
                      (split-string output "\n" t))
@@ -143,7 +149,7 @@
               '()
             (seq-take
              (mapcar (lambda (line)
-                       (let ((parts (split-string line "\t+" nil)))
+                       (let ((parts (split-string line "\t")))
                          (list :key (string-trim (or (nth 0 parts) ""))
                                :summary (string-trim (or (nth 1 parts) ""))
                                :type (string-trim (or (nth 2 parts) "")))))
@@ -167,7 +173,7 @@
           (if (string-empty-p output)
               '()
             (mapcar (lambda (line)
-                      (let ((parts (split-string line "\t+" nil)))
+                      (let ((parts (split-string line "\t")))
                         (list :key (string-trim (or (nth 0 parts) ""))
                               :summary (string-trim (or (nth 1 parts) ""))
                               :assignee (string-trim (or (nth 2 parts) ""))
@@ -195,7 +201,7 @@
 (defun workbench-jira--ticket-commented-today-p (key)
   "Return t if KEY has a comment from today."
   (when-let ((date-str (workbench-jira--ticket-last-comment-date key)))
-    (let ((today (format-time-string "%d %b %y")))
+    (let ((today (format-time-string "%d %b %Y")))
       (string-match-p (regexp-quote today) date-str))))
 
 (defun workbench-jira--team-ticket-last-comment (key)
@@ -210,7 +216,11 @@
       (list :author author :snippet snippet))))
 
 (defun workbench-jira-days-since-update (updated-str)
-  "Return days since UPDATED-STR, or nil if unparseable."
+  "Return days since UPDATED-STR, or nil if unparseable.
+Limitation: only absolute date formats (ISO 8601, RFC 2822, etc.) are supported.
+Relative date strings like \"2 hours ago\" or \"3 days ago\" that jira-cli may
+output will return nil.  Configure jira-cli to use ISO date output
+\(e.g. `jira config set output.date iso-8601`) to ensure correct parsing."
   (condition-case nil
       (let* ((time (date-to-time updated-str))
              (diff (time-subtract (current-time) time)))
@@ -246,20 +256,103 @@ Consumers (command centre, org) add functions here to react to new data.")
        (< (float-time (time-subtract (current-time) workbench-jira--cache-time))
           workbench-jira-refresh-interval)))
 
-(defun workbench-jira-refresh ()
-  "Refresh the Jira cache synchronously and run hooks."
+(defvar workbench-jira--async-process nil
+  "Current async Jira refresh process, or nil.")
+
+(defvar workbench-jira--async-timeout nil
+  "Timeout timer for the current async Jira refresh.")
+
+(defun workbench-jira-refresh-sync ()
+  "Refresh the Jira cache synchronously and run hooks.
+Use this for callers that need blocking behaviour (e.g. first-call cache population)."
   (interactive)
-  (setq workbench-jira--cache
-        (list :tickets (workbench-jira--fetch-tickets)
-              :done (workbench-jira--fetch-done)
-              :next (workbench-jira--fetch-next)))
-  (setq workbench-jira--cache-time (current-time))
-  (run-hooks 'workbench-jira-after-refresh-hook))
+  (let ((result (list :tickets (workbench-jira--fetch-tickets)
+                      :done (workbench-jira--fetch-done)
+                      :next (workbench-jira--fetch-next))))
+    (unless (or (workbench-jira-error-p (plist-get result :tickets))
+                (workbench-jira-error-p (plist-get result :done))
+                (workbench-jira-error-p (plist-get result :next)))
+      (setq workbench-jira--cache result)
+      (setq workbench-jira--cache-time (current-time))
+      (run-hooks 'workbench-jira-after-refresh-hook))))
+
+(defun workbench-jira-refresh ()
+  "Refresh the Jira cache asynchronously and run hooks when done.
+Spawns a child Emacs (batch) that runs the three fetch calls and prints
+the result. Parses output in the sentinel callback."
+  (interactive)
+  ;; Kill any in-flight fetch
+  (when (and workbench-jira--async-process
+             (process-live-p workbench-jira--async-process))
+    (delete-process workbench-jira--async-process))
+  (when (timerp workbench-jira--async-timeout)
+    (cancel-timer workbench-jira--async-timeout)
+    (setq workbench-jira--async-timeout nil))
+  (let* ((jira-file (expand-file-name
+                     "modules/tools/jira.el"
+                     doom-user-dir))
+         (form `(progn
+                  (setq workbench-jira-project ,workbench-jira-project
+                        workbench-jira-user ,workbench-jira-user
+                        workbench-jira-git-author ,workbench-jira-git-author
+                        workbench-jira-code-root ,workbench-jira-code-root
+                        workbench-jira-spark-url ,workbench-jira-spark-url
+                        workbench-jira-team-name ,workbench-jira-team-name
+                        workbench-jira-team-id ,workbench-jira-team-id
+                        workbench-jira-team-wip-limit ,workbench-jira-team-wip-limit
+                        workbench-jira-team-members ',workbench-jira-team-members
+                        workbench-jira-status-next ,workbench-jira-status-next
+                        workbench-jira-status-wip ,workbench-jira-status-wip
+                        workbench-jira-status-done ,workbench-jira-status-done)
+                  (load ,jira-file nil t)
+                  (let ((result (list :tickets (workbench-jira--fetch-tickets)
+                                      :done (workbench-jira--fetch-done)
+                                      :next (workbench-jira--fetch-next))))
+                    (prin1 result))))
+         (emacs-bin (expand-file-name invocation-name invocation-directory))
+         (output-buf (generate-new-buffer " *jira-async*"))
+         (proc (make-process
+                :name "jira-refresh"
+                :buffer output-buf
+                :command (list emacs-bin "--batch" "--eval" (prin1-to-string form))
+                :noquery t
+                :sentinel
+                (lambda (process _event)
+                  (when (memq (process-status process) '(exit signal))
+                    (when (timerp workbench-jira--async-timeout)
+                      (cancel-timer workbench-jira--async-timeout)
+                      (setq workbench-jira--async-timeout nil))
+                    (let ((result nil))
+                      (if (zerop (process-exit-status process))
+                          (with-current-buffer (process-buffer process)
+                            (goto-char (point-min))
+                            (condition-case nil
+                                (setq result (read (current-buffer)))
+                              (error
+                               (message "Jira refresh: failed to parse fetch result"))))
+                        (message "Jira refresh: process exited %d"
+                                 (process-exit-status process)))
+                      (kill-buffer (process-buffer process))
+                      (when (eq workbench-jira--async-process process)
+                        (setq workbench-jira--async-process nil))
+                      (when result
+                        (setq workbench-jira--cache result)
+                        (setq workbench-jira--cache-time (current-time))
+                        (run-hooks 'workbench-jira-after-refresh-hook))))))))
+    (setq workbench-jira--async-process proc)
+    ;; Timeout: kill after 60s if still running
+    (setq workbench-jira--async-timeout
+          (run-at-time 60 nil
+                       (lambda ()
+                         (when (and (process-live-p proc)
+                                    (eq workbench-jira--async-process proc))
+                           (message "Jira refresh: fetch timed out after 60s")
+                           (delete-process proc)))))))
 
 (defun workbench-jira-ensure-cache ()
-  "Ensure the cache is populated. Refreshes if stale or empty."
+  "Ensure the cache is populated. Refreshes synchronously if stale or empty."
   (unless (workbench-jira-cache-fresh-p)
-    (workbench-jira-refresh)))
+    (workbench-jira-refresh-sync)))
 
 (defun workbench-jira--maybe-refresh ()
   "Refresh if Emacs is not in the middle of user input."
@@ -282,11 +375,13 @@ Consumers (command centre, org) add functions here to react to new data.")
     (cancel-timer workbench-jira--timer)
     (setq workbench-jira--timer nil)))
 
+(defun workbench-jira--maybe-start-timer ()
+  "Start the Jira refresh timer if project and user are configured."
+  (when (and workbench-jira-project workbench-jira-user)
+    (workbench-jira-start-timer)))
+
 ;; Start the timer when Jira is configured
-(add-hook 'doom-init-ui-hook
-          (lambda ()
-            (when (and workbench-jira-project workbench-jira-user)
-              (workbench-jira-start-timer))))
+(add-hook 'doom-init-ui-hook #'workbench-jira--maybe-start-timer)
 
 ;; ── Backward compatibility ──────────────────────────────────────────────────
 ;; Profile local.el may have set the old workbench-cc--* variable names before
@@ -310,7 +405,7 @@ Consumers (command centre, org) add functions here to react to new data.")
     (let ((old (car pair))
           (new (cdr pair)))
       (when (and (boundp old) (symbol-value old)
-                 (not (symbol-value new)))
+                 (equal (symbol-value new) (default-value new)))
         (set new (symbol-value old))))))
 
 (workbench-jira--migrate-legacy-vars)
