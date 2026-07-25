@@ -1,13 +1,19 @@
 ;;; tools/terminals.el -*- lexical-binding: t; -*-
 
+(require 'seq)
 (declare-function workbench--project-root "modules/tools/files")
 
+;; workbench--workspace-directories is defined in workflows/coding.el (hash-table).
+;; We access it as a fallback — guarded with hash-table-p at use site.
+
 (defun workbench/open-terminal-workspace ()
-  "Open a new workspace with a fresh terminal, like a tmux new window."
+  "Open a new workspace with a fresh terminal, like a tmux new window.
+Starts in the current project root (or a sensible fallback if outside a project)."
   (interactive)
-  (+workspace/new)
-  (let ((default-directory "~/"))
-    (vterm (generate-new-buffer-name "*terminal*"))))
+  (let ((root (workbench--popup-terminal-sensible-root)))
+    (+workspace/new)
+    (let ((default-directory root))
+      (vterm (generate-new-buffer-name "*terminal*")))))
 
 ;; Popup terminal — workspace-scoped.
 ;;
@@ -28,17 +34,36 @@ Non-nil entry means the popup is active in that workspace.")
   "Return the popup buffer name for the current workspace."
   (format "*workbench-popup-term:%s*" (+workspace-current-name)))
 
+(defun workbench--popup-terminal-sensible-root ()
+  "Return a sensible root for the popup terminal.
+Prefers the project root. If that's just ~ or /, tries the workspace's
+registered directory, then falls back to `workbench-jira-code-root'."
+  (let ((root (workbench--project-root)))
+    (if (and root
+             (not (equal (file-truename root) (file-truename "~/")))
+             (not (equal root "/")))
+        root
+      ;; Try workspace directory registry
+      (or (and (boundp 'workbench--workspace-directories)
+               (hash-table-p workbench--workspace-directories)
+               (gethash (+workspace-current-name) workbench--workspace-directories))
+          (expand-file-name (or (bound-and-true-p workbench-jira-code-root) "~/code/"))))))
+
 (defun workbench--popup-terminal-buffer ()
   "Return the popup terminal vterm buffer for the current workspace.
 Creates a new buffer at the project root if one doesn't exist yet.
-Defers `vterm-mode' until after the buffer is displayed so the terminal
-gets correct window dimensions on first draw."
+Kills and recreates the buffer if it exists but is not in vterm-mode (e.g.
+after a failed vterm-mode init). Defers `vterm-mode' until after the buffer
+is displayed so the terminal gets correct window dimensions on first draw."
   (let* ((name (workbench--popup-terminal-buffer-name))
          (buffer (get-buffer name)))
     (if (and (buffer-live-p buffer)
              (with-current-buffer buffer (derived-mode-p 'vterm-mode)))
         buffer
-      (let ((root (workbench--project-root)))
+      ;; Buffer is dead or not in vterm-mode — kill and start fresh
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer))
+      (let ((root (workbench--popup-terminal-sensible-root)))
         (with-current-buffer (get-buffer-create name)
           (setq default-directory root)
           (current-buffer))))))
@@ -47,14 +72,33 @@ gets correct window dimensions on first draw."
   "Return non-nil if the popup terminal buffer is currently displayed."
   (let ((buf (get-buffer (workbench--popup-terminal-buffer-name))))
     (and (buffer-live-p buf)
-         (eq (current-buffer) buf))))
+         (get-buffer-window buf))))
+
+(defun workbench--popup-terminal-primary-window ()
+  "Return the best window to return focus to after dismissing the popup.
+Prefers a window showing a file-visiting or code buffer over AI panes,
+Treemacs, or special buffers. Falls back to the selected window."
+  (or (seq-find (lambda (win)
+                  (let ((buf (window-buffer win)))
+                    (and (not (window-dedicated-p win))
+                         (not (minibufferp buf))
+                         (with-current-buffer buf
+                           (and (not (derived-mode-p 'vterm-mode))
+                                (not (string-prefix-p "*project-" (buffer-name)))
+                                (not (string-prefix-p " *Treemacs" (buffer-name)))
+                                (not (string-prefix-p "*workbench-popup-term" (buffer-name))))))))
+                (window-list))
+      (selected-window)))
 
 (defun workbench/toggle-popup-terminal ()
   "Toggle a full-frame project shell scoped to the current workspace.
-Each workspace maintains its own terminal and layout state independently."
+Each workspace maintains its own terminal and layout state independently.
+On dismiss, selects the primary editing window rather than whichever window
+was focused when the popup was opened."
   (interactive)
   (let ((ws (+workspace-current-name)))
-    (if (workbench--popup-terminal-showing-p)
+    (if (or (workbench--popup-terminal-showing-p)
+            (gethash ws workbench--popup-terminal-configs))
         ;; Hide — restore previous layout
         (let ((config (gethash ws workbench--popup-terminal-configs)))
           (remhash ws workbench--popup-terminal-configs)
@@ -62,7 +106,11 @@ Each workspace maintains its own terminal and layout state independently."
            ;; Valid config for this frame — restore it
            ((and (window-configuration-p config)
                  (eq (window-configuration-frame config) (selected-frame)))
-            (set-window-configuration config))
+            (set-window-configuration config)
+            ;; After restoring, select the primary editing window so the user
+            ;; doesn't land in the AI pane or Treemacs regardless of where
+            ;; they originally toggled from.
+            (select-window (workbench--popup-terminal-primary-window)))
            ;; Stale or missing config — bury and switch to a sensible buffer
            (t
             (when-let ((buf (get-buffer (workbench--popup-terminal-buffer-name))))
@@ -71,14 +119,31 @@ Each workspace maintains its own terminal and layout state independently."
             ;; the user staring at a random or dead buffer.
             (when (eq (current-buffer) (get-buffer (workbench--popup-terminal-buffer-name)))
               (switch-to-buffer (other-buffer (current-buffer) t))))))
-      ;; Show — save layout and take over the frame
-      (puthash ws (current-window-configuration) workbench--popup-terminal-configs)
+      ;; Show — save layout and take over the frame.
+      ;; If the selected window is dedicated (e.g. Treemacs), select a
+      ;; non-dedicated window first so that switch-to-buffer works.
+      (when (window-dedicated-p)
+        (let ((target (seq-find (lambda (w) (not (window-dedicated-p w)))
+                                (window-list))))
+          (when target (select-window target))))
+      (unless (gethash ws workbench--popup-terminal-configs)
+        (puthash ws (current-window-configuration) workbench--popup-terminal-configs))
       (let ((ignore-window-parameters t))
         (delete-other-windows))
+      ;; After delete-other-windows, clear any residual window dedication
+      ;; on the sole remaining window so switch-to-buffer succeeds.
+      (set-window-dedicated-p (selected-window) nil)
       (let ((buf (workbench--popup-terminal-buffer)))
         (switch-to-buffer buf)
         (unless (derived-mode-p 'vterm-mode)
-          (vterm-mode))))))
+          (condition-case err
+              (vterm-mode)
+            (error
+             (let ((config (gethash ws workbench--popup-terminal-configs)))
+               (remhash ws workbench--popup-terminal-configs)
+               (when (window-configuration-p config)
+                 (set-window-configuration config)))
+             (user-error "vterm-mode failed: %s" (error-message-string err)))))))))
 
 ;; When switching workspaces, persp restores its own window config, which
 ;; may conflict with the saved pre-popup layout in the hash table. If we
