@@ -349,7 +349,18 @@ the result. Parses output in the sentinel callback."
                       (when (eq workbench-jira--async-process process)
                         (setq workbench-jira--async-process nil))
                       (when result
-                        (setq workbench-jira--cache result)
+                        ;; Merge: only overwrite cache fields that succeeded.
+                        ;; Preserve existing good data for fields that errored.
+                        (let ((merged (list :tickets (if (workbench-jira-error-p (plist-get result :tickets))
+                                                        (plist-get workbench-jira--cache :tickets)
+                                                      (plist-get result :tickets))
+                                            :done (if (workbench-jira-error-p (plist-get result :done))
+                                                      (plist-get workbench-jira--cache :done)
+                                                    (plist-get result :done))
+                                            :next (if (workbench-jira-error-p (plist-get result :next))
+                                                      (plist-get workbench-jira--cache :next)
+                                                    (plist-get result :next)))))
+                          (setq workbench-jira--cache merged))
                         (setq workbench-jira--cache-time (current-time))
                         (run-hooks 'workbench-jira-after-refresh-hook))))))))
     (setq workbench-jira--async-process proc)
