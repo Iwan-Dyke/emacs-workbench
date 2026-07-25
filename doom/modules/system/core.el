@@ -8,6 +8,10 @@
 
 (global-auto-revert-mode +1)
 
+;; UK Mac keyboard: right Option passes through for # £ € etc.
+;; Left Option remains Meta for Emacs bindings.
+(setq ns-right-alternate-modifier 'none)
+
 (defvar workbench/profile
   (let ((profile (or ;; Prefer daemon name — env var is unreliable across macOS daemon restarts
                      (let ((name (daemonp)))
