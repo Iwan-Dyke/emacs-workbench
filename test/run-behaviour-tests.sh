@@ -310,8 +310,8 @@ test_full_layout() {
     result=$(eval_or_fail "full layout opens" '
       (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
         (+workspace-switch "files" t)
-        (dired "/Users/iwandyke/code/emacs-workbench/")
-        (dired-goto-file "/Users/iwandyke/code/emacs-workbench/doom")
+        (dired (expand-file-name "doom" "'$REPO_ROOT'"))
+        (dired-goto-file (expand-file-name "doom/config.el" "'$REPO_ROOT'"))
         (condition-case err
           (progn
             (workbench/open-project-workspace-full-layout)
@@ -534,7 +534,7 @@ test_popup_magit() {
     eval_or_fail "setup for magit" '
       (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
         (+workspace-switch "main" t)
-        (setq default-directory "/Users/iwandyke/code/emacs-workbench/")
+        (setq default-directory "'$REPO_ROOT'")
         t)' >/dev/null
 
     # Toggle magit ON
@@ -589,7 +589,7 @@ test_project_dashboard() {
         (+workspace-switch "main" t)
         (condition-case err
           (progn
-            (workbench/open-project-dashboard "/Users/iwandyke/code/emacs-workbench/")
+            (workbench/open-project-dashboard "'$REPO_ROOT'")
             "ok")
           (error (format "ERROR: %S" err))))') || return
 

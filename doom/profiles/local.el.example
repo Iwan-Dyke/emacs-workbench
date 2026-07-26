@@ -1,3 +1,4 @@
 ;;; profiles/local.el.example -*- lexical-binding: t; -*-
 
 ;; Copy to local.el for machine-specific non-secret overrides.
+;; (setq user-full-name "Your Name")
