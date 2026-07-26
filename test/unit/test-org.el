@@ -132,5 +132,52 @@
         (should (string-match-p "Real ticket" content))
         ;; Error message NOT written to file
         (should-not (string-match-p "No tickets loaded" content))))))
+;;; ── Stale skip function ────────────────────────────────────────────────────
+
+(ert-deftest org/stale-skip-skips-recent ()
+  "Entries updated within 14 days are skipped."
+  (let ((recent (format-time-string "%Y-%m-%dT%H:%M:%S%z"
+                  (time-subtract (current-time) (days-to-time 3)))))
+    (with-temp-buffer
+      (org-mode)
+      (insert "* TODO X-1 Test\n:PROPERTIES:\n:UPDATED: " recent "\n:END:\n")
+      (goto-char (point-min))
+      (should (workbench-org--stale-skip)))))
+
+(ert-deftest org/stale-skip-shows-old ()
+  "Entries updated >14 days ago are shown."
+  (let ((old (format-time-string "%Y-%m-%dT%H:%M:%S%z"
+               (time-subtract (current-time) (days-to-time 20)))))
+    (with-temp-buffer
+      (org-mode)
+      (insert "* TODO X-2 Stale\n:PROPERTIES:\n:UPDATED: " old "\n:END:\n")
+      (goto-char (point-min))
+      (should-not (workbench-org--stale-skip)))))
+
+(ert-deftest org/stale-skip-skips-no-updated ()
+  "Entries without UPDATED property are skipped."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* TODO X-3 No date\n:PROPERTIES:\n:END:\n")
+    (goto-char (point-min))
+    (should (workbench-org--stale-skip))))
+
+(ert-deftest org/stale-skip-skips-unparseable ()
+  "Entries with unparseable UPDATED are skipped."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* TODO X-4 Relative\n:PROPERTIES:\n:UPDATED: 2 hours ago\n:END:\n")
+    (goto-char (point-min))
+    (should (workbench-org--stale-skip))))
+
+(ert-deftest org/weeknote-path-format ()
+  "Weeknote path uses weeknotes/YYYY-WNN.org format."
+  (let ((week (format-time-string "%Y-W%V")))
+    (cl-letf (((symbol-function 'find-file)
+               (lambda (path) path)))
+      (let ((result (workbench-org/open-weeknote)))
+        (should (string-match-p (regexp-quote week) result))
+        (should (string-match-p "weeknotes/" result))
+        (should (string-suffix-p ".org" result))))))
 
 ;;; test-org.el ends here

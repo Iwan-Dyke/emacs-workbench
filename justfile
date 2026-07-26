@@ -33,6 +33,8 @@ test:
       -l test/unit/test-repos.el \
       -l test/unit/test-repos-render.el \
       -l test/unit/test-visual.el \
+      -l test/unit/test-command-centre.el \
+      -l test/unit/test-interface.el \
       -f ert-run-tests-batch-and-exit
 
 test-behaviour profile="work":

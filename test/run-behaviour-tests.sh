@@ -722,6 +722,78 @@ test_resize_mode() {
     assert_equal "SPC w r → resize mode" \
         '(lookup-key doom-leader-map "wr")' \
         "workbench/resize-mode"
+
+    # Resize mode actually changes window width
+    assert_true "resize-mode changes window width" \
+        '(with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+           (delete-other-windows)
+           (split-window-horizontally)
+           (let ((before (window-total-width)))
+             (workbench/resize-mode)
+             (workbench/resize-left)
+             (workbench--resize-exit)
+             (not (= before (window-total-width)))))'
+
+    # Resize exit clears the overriding map
+    assert_equal "resize exit clears overriding map" \
+        '(progn
+           (workbench/resize-mode)
+           (workbench--resize-exit)
+           overriding-terminal-local-map)' \
+        "nil"
+}
+
+test_cc_refresh() {
+    info "── Command Centre Refresh ──"
+
+    if [[ "$PROFILE" != "work" ]]; then
+        info "(skipped — work profile only)"
+        return
+    fi
+
+    # CC fetch was triggered (data may still be loading)
+    assert_not_nil "CC fetch was triggered or has data" \
+        '(or workbench-cc--data workbench-cc--async-process)'
+
+    # R key in CC is bound to refresh
+    assert_equal "R in CC buffer → refresh" \
+        '(with-current-buffer "*command-centre*"
+           (key-binding "R"))' \
+        "workbench-cc-refresh"
+
+    # r key in CC is bound to redraw
+    assert_equal "r in CC buffer → redraw" \
+        '(with-current-buffer "*command-centre*"
+           (key-binding "r"))' \
+        "workbench-cc-redraw"
+}
+
+test_org_agenda_live() {
+    info "── Org Agenda Live ──"
+
+    # SPC n a opens agenda
+    local agenda_result
+    agenda_result=$(eval_or_fail "open org agenda" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (condition-case err
+          (progn (workbench-org/open-agenda) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$agenda_result" == '"ok"' ]]; then
+        pass "org agenda opens"
+    else
+        fail "org agenda opens (got: $agenda_result)"
+        return
+    fi
+
+    sleep 1
+
+    # Agenda buffer exists
+    assert_not_nil "org-agenda buffer exists" \
+        '(seq-some (lambda (buf)
+           (with-current-buffer buf
+             (derived-mode-p (quote org-agenda-mode))))
+           (buffer-list))'
 }
 
 test_additional_keybindings() {
@@ -936,6 +1008,8 @@ test_theme
 test_persp_config
 test_lsp_config
 test_resize_mode
+test_cc_refresh
+test_org_agenda_live
 test_org_integration
 test_ai_workspace
 test_files_workspace
