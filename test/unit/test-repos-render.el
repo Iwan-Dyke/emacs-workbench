@@ -181,5 +181,104 @@
             (should (equal path "/Users/test/code/sifft"))))
       (kill-buffer buf))))
 
+;;; ── Render edge cases ──────────────────────────────────────────────────────
+
+(ert-deftest repos-render/single-repo ()
+  "Renders correctly with a single repo."
+  (let* ((single (list (car test-repos-render--sample)))
+         (buf (workbench-repos--render single)))
+    (unwind-protect
+        (with-current-buffer buf
+          (should (string-match-p "1 repos" (buffer-string)))
+          (should (string-match-p "emacs-workbench" (buffer-string))))
+      (kill-buffer buf))))
+
+(ert-deftest repos-render/all-clean-no-dirty-header ()
+  "When all repos are clean, no 'dirty' appears in header."
+  (let* ((clean-only (list (list :name "a" :path "/a" :branch "main" :state 'clean
+                                 :dirty 0 :ahead 0 :behind 0 :last-commit "" :stash 0)))
+         (buf (workbench-repos--render clean-only)))
+    (unwind-protect
+        (with-current-buffer buf
+          (let ((content (buffer-string)))
+            (should (string-match-p "1 repos" content))
+            (should-not (string-match-p "dirty" content))))
+      (kill-buffer buf))))
+
+(ert-deftest repos-render/all-paths-have-property ()
+  "Every repo line gets a workbench-repos-path property."
+  (let ((buf (workbench-repos--render test-repos-render--sample)))
+    (unwind-protect
+        (with-current-buffer buf
+          (let ((paths-found 0))
+            (goto-char (point-min))
+            (while (not (eobp))
+              (when (get-text-property (point) 'workbench-repos-path)
+                (cl-incf paths-found))
+              (forward-line 1))
+            ;; At least 3 lines should have the path property
+            (should (>= paths-found 3))))
+      (kill-buffer buf))))
+
+(ert-deftest repos-render/toolbar-shows-filter ()
+  "Toolbar shows the current filter name."
+  (let ((workbench-repos--current-filter 'dirty)
+        (workbench-repos--current-sort 'name)
+        (workbench-repos--current-search ""))
+    (let ((buf (workbench-repos--render test-repos-render--sample)))
+      (unwind-protect
+          (with-current-buffer buf
+            (should (string-match-p "dirty" (buffer-string))))
+        (kill-buffer buf)))))
+
+(ert-deftest repos-render/toolbar-shows-search ()
+  "Toolbar shows active search term."
+  (let ((workbench-repos--current-filter 'all)
+        (workbench-repos--current-sort 'name)
+        (workbench-repos--current-search "sifft"))
+    (let ((buf (workbench-repos--render test-repos-render--sample)))
+      (unwind-protect
+          (with-current-buffer buf
+            (should (string-match-p "Search:.*sifft" (buffer-string))))
+        (kill-buffer buf)))))
+
+(ert-deftest repos-render/long-branch-truncated ()
+  "Long branch names are truncated to fit."
+  (let* ((repos (list (list :name "proj" :path "/proj"
+                            :branch "feature/very-long-branch-name-that-exceeds-column-width"
+                            :state 'clean :dirty 0 :ahead 0 :behind 0
+                            :last-commit "" :stash 0)))
+         (buf (workbench-repos--render repos)))
+    (unwind-protect
+        (with-current-buffer buf
+          ;; Should not contain the full branch name (truncated at 25 chars)
+          (let ((content (buffer-string)))
+            (should (string-match-p "feature/very-long" content))
+            (should-not (string-match-p "exceeds-column-width" content))))
+      (kill-buffer buf))))
+
+(ert-deftest repos-render/zero-stash-not-shown ()
+  "Stash indicator is not rendered when count is 0."
+  (let* ((repos (list (list :name "proj" :path "/proj" :branch "main"
+                            :state 'clean :dirty 0 :ahead 0 :behind 0
+                            :last-commit "" :stash 0)))
+         (buf (workbench-repos--render repos)))
+    (unwind-protect
+        (with-current-buffer buf
+          (should-not (string-match-p "⚑" (buffer-string))))
+      (kill-buffer buf))))
+
+(ert-deftest repos-render/behind-repos-have-error-face ()
+  "Behind indicator uses error face."
+  (let ((buf (workbench-repos--render test-repos-render--sample)))
+    (unwind-protect
+        (with-current-buffer buf
+          (goto-char (point-min))
+          (search-forward "↓3")
+          (let ((face (get-text-property (match-beginning 0) 'face)))
+            (should (or (eq face 'error)
+                        (eq face 'workbench-repos-behind)))))
+      (kill-buffer buf))))
+
 (provide 'test-repos-render)
 ;;; test-repos-render.el ends here

@@ -227,5 +227,162 @@
   (let ((repos (list (list :name "x" :state 'dirty :dirty 1 :ahead 0 :behind 5 :branch "main"))))
     (should (= (length (workbench-repos--pullable repos)) 0))))
 
+;;; ── Scanner edge cases ─────────────────────────────────────────────────────
+
+(ert-deftest repos/scan-skips-symlinks ()
+  "Scanner does not follow symlinks to avoid cycles."
+  (workbench-test-with-temp-dir root
+    (let ((repo (expand-file-name "real-project" root)))
+      (make-directory repo)
+      (make-directory (expand-file-name ".git" repo))
+      ;; Create a symlink pointing back to root (cycle)
+      (condition-case nil
+          (make-symbolic-link root (expand-file-name "loop" root))
+        (file-already-exists nil))
+      (let ((found (workbench-repos--scan-roots (list root))))
+        (should (= (length found) 1))))))
+
+(ert-deftest repos/scan-deep-nesting ()
+  "Scanner finds repos several levels deep."
+  (workbench-test-with-temp-dir root
+    (let ((deep (expand-file-name "org/team/project" root)))
+      (make-directory deep t)
+      (make-directory (expand-file-name ".git" deep))
+      (let ((found (workbench-repos--scan-roots (list root))))
+        (should (= (length found) 1))))))
+
+(ert-deftest repos/scan-empty-root ()
+  "Scanner handles empty root directory."
+  (workbench-test-with-temp-dir root
+    (let ((found (workbench-repos--scan-roots (list root))))
+      (should (= (length found) 0)))))
+
+(ert-deftest repos/scan-deduplicates ()
+  "Scanner does not return the same repo twice even with overlapping roots."
+  (workbench-test-with-temp-dir root
+    (let ((repo (expand-file-name "project" root)))
+      (make-directory repo)
+      (make-directory (expand-file-name ".git" repo))
+      ;; Scan the same root twice
+      (let ((found (workbench-repos--scan-roots (list root root))))
+        (should (= (length found) 1))))))
+
+;;; ── Status edge cases ──────────────────────────────────────────────────────
+
+(ert-deftest repos/parse-status-name-from-path ()
+  "Status extracts repo name from the directory path."
+  (cl-letf (((symbol-function 'workbench-repos--shell) (lambda (&rest _) nil)))
+    (let ((status (workbench-repos--repo-status "/Users/dev/code/my-project")))
+      (should (equal (plist-get status :name) "my-project")))))
+
+(ert-deftest repos/parse-status-path-preserved ()
+  "Status preserves the full path."
+  (cl-letf (((symbol-function 'workbench-repos--shell) (lambda (&rest _) nil)))
+    (let ((status (workbench-repos--repo-status "/Users/dev/code/my-project")))
+      (should (equal (plist-get status :path) "/Users/dev/code/my-project")))))
+
+(ert-deftest repos/parse-status-all-nil-is-safe ()
+  "Status handles all git commands returning nil (broken repo)."
+  (cl-letf (((symbol-function 'workbench-repos--shell) (lambda (&rest _) nil)))
+    (let ((status (workbench-repos--repo-status "/tmp/broken-repo")))
+      (should (equal (plist-get status :branch) "(detached)"))
+      (should (equal (plist-get status :state) 'clean))
+      (should (= (plist-get status :dirty) 0))
+      (should (= (plist-get status :ahead) 0))
+      (should (= (plist-get status :behind) 0))
+      (should (= (plist-get status :stash) 0))
+      (should (equal (plist-get status :last-commit) "")))))
+
+(ert-deftest repos/parse-status-only-untracked ()
+  "Repo with only untracked files is dirty."
+  (cl-letf (((symbol-function 'workbench-repos--shell)
+             (lambda (_dir &rest args)
+               (pcase (car args)
+                 ("git" (pcase (cadr args)
+                          ("branch" "main")
+                          ("status" "?? newfile.txt")
+                          ("rev-list" "0\t0")
+                          ("log" "1h ago")
+                          ("stash" nil)))))))
+    (let ((status (workbench-repos--repo-status "/tmp/repo")))
+      (should (eq (plist-get status :state) 'dirty))
+      (should (= (plist-get status :dirty) 1)))))
+
+;;; ── Filter combinations ────────────────────────────────────────────────────
+
+(ert-deftest repos/filter-unknown-returns-all ()
+  "Unknown filter type returns all repos unchanged."
+  (let ((result (workbench-repos--filter 'nonexistent test-repos--sample-statuses)))
+    (should (= (length result) 4))))
+
+(ert-deftest repos/filter-empty-list ()
+  "Filtering an empty list returns empty."
+  (should (null (workbench-repos--filter 'dirty '()))))
+
+;;; ── Sort stability ─────────────────────────────────────────────────────────
+
+(ert-deftest repos/sort-unknown-returns-copy ()
+  "Unknown sort type returns a copy (not nil, not error)."
+  (let ((result (workbench-repos--sort 'nonexistent test-repos--sample-statuses)))
+    (should (= (length result) 4))))
+
+(ert-deftest repos/sort-single-item ()
+  "Sorting a single-item list works."
+  (let ((repos (list (list :name "solo" :state 'clean :dirty 0 :ahead 0 :behind 0 :branch "main"))))
+    (should (= (length (workbench-repos--sort 'name repos)) 1))))
+
+(ert-deftest repos/sort-does-not-mutate ()
+  "Sort returns a new list, doesn't mutate input."
+  (let* ((repos (list (list :name "b" :state 'clean :dirty 0 :ahead 0 :behind 0 :branch "main")
+                      (list :name "a" :state 'dirty :dirty 1 :ahead 0 :behind 0 :branch "dev")))
+         (original-first (plist-get (car repos) :name)))
+    (workbench-repos--sort 'name repos)
+    (should (equal (plist-get (car repos) :name) original-first))))
+
+;;; ── Search edge cases ──────────────────────────────────────────────────────
+
+(ert-deftest repos/search-nil-query-returns-all ()
+  "Nil query returns all repos."
+  (let ((result (workbench-repos--search nil test-repos--sample-statuses)))
+    (should (= (length result) 4))))
+
+(ert-deftest repos/search-special-regex-chars ()
+  "Search with regex special characters doesn't error."
+  (let ((result (workbench-repos--search "al.ha" test-repos--sample-statuses)))
+    ;; Should not match because . is escaped (not regex wildcard)
+    (should (= (length result) 0))))
+
+(ert-deftest repos/search-partial-match ()
+  "Matches anywhere in name, not just prefix."
+  (let ((result (workbench-repos--search "pha" test-repos--sample-statuses)))
+    (should (= (length result) 1))
+    (should (equal (plist-get (car result) :name) "alpha"))))
+
+;;; ── Pullable edge cases ────────────────────────────────────────────────────
+
+(ert-deftest repos/pullable-empty-list ()
+  "Pullable on empty list returns empty."
+  (should (null (workbench-repos--pullable '()))))
+
+(ert-deftest repos/pullable-clean-not-behind ()
+  "Clean repos with behind=0 are not pullable."
+  (let ((repos (list (list :name "x" :state 'clean :dirty 0 :ahead 0 :behind 0 :branch "main"))))
+    (should (null (workbench-repos--pullable repos)))))
+
+;;; ── get-all-statuses ───────────────────────────────────────────────────────
+
+(ert-deftest repos/get-all-statuses-maps-paths ()
+  "get-all-statuses calls repo-status for each path."
+  (let ((called '()))
+    (cl-letf (((symbol-function 'workbench-repos--repo-status)
+               (lambda (path)
+                 (push path called)
+                 (list :name (file-name-nondirectory path) :path path
+                       :branch "main" :state 'clean :dirty 0
+                       :ahead 0 :behind 0 :stash 0 :last-commit ""))))
+      (let ((result (workbench-repos--get-all-statuses '("/a" "/b" "/c"))))
+        (should (= (length result) 3))
+        (should (= (length called) 3))))))
+
 (provide 'test-repos)
 ;;; test-repos.el ends here
