@@ -789,6 +789,72 @@ test_repos_workspace() {
     # Buffer is read-only
     assert_not_nil "repos buffer is read-only" \
         '(with-current-buffer "*repos*" buffer-read-only)'
+
+    # Point starts on a data row (vtable-current-object is non-nil)
+    assert_not_nil "point is on a data row after open" \
+        '(with-current-buffer "*repos*"
+           (goto-char (point-min))
+           (let ((found nil))
+             (while (and (not found) (not (eobp)))
+               (when (vtable-current-object)
+                 (setq found t))
+               (unless found (forward-line 1)))
+             found))'
+
+    # Filter cycle works
+    assert_equal "filter cycles to dirty" \
+        '(with-current-buffer "*repos*"
+           (setq workbench-repos--current-filter '"'"'all)
+           (workbench-repos-cycle-filter)
+           (substring-no-properties (symbol-name workbench-repos--current-filter)))' \
+        '"dirty"'
+
+    # Sort cycle works
+    assert_equal "sort cycles to status" \
+        '(with-current-buffer "*repos*"
+           (setq workbench-repos--current-sort '"'"'name)
+           (workbench-repos-cycle-sort)
+           (substring-no-properties (symbol-name workbench-repos--current-sort)))' \
+        '"status"'
+
+    # path-at-point returns a path on data row
+    assert_not_nil "path-at-point works on data row" \
+        '(with-current-buffer "*repos*"
+           (goto-char (point-min))
+           (let ((found nil))
+             (while (and (not found) (not (eobp)))
+               (when (vtable-current-object)
+                 (setq found t))
+               (unless found (forward-line 1)))
+             (when found (workbench-repos--path-at-point))))'
+
+    # Fetch all runs without error
+    local fetch_result
+    TIMEOUT=30
+    fetch_result=$(eval_or_fail "fetch all runs" '
+      (with-current-buffer "*repos*"
+        (condition-case err
+          (progn (workbench-repos-fetch-all) "ok")
+          (error (format "ERROR: %S" err))))') || { TIMEOUT=5; return; }
+    TIMEOUT=5
+
+    if [[ "$fetch_result" == '"ok"' ]]; then
+        pass "fetch all completes without error"
+    else
+        fail "fetch all (got: $fetch_result)"
+    fi
+
+    # Pull selected on clean+not-behind gives message (not error)
+    assert_not_nil "pull-selected on up-to-date repo gives message" \
+        '(with-current-buffer "*repos*"
+           (setq workbench-repos--current-filter '"'"'clean)
+           (workbench-repos--redraw)
+           (goto-char (point-min))
+           (vtable-beginning-of-table)
+           (forward-line 1)
+           (condition-case err
+             (progn (workbench-repos-pull-selected) "ok-or-message")
+             (user-error (error-message-string err))))'
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────

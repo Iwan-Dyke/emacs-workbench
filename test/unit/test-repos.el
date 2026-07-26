@@ -384,5 +384,67 @@
         (should (= (length result) 3))
         (should (= (length called) 3))))))
 
+;;; ── Command logic ──────────────────────────────────────────────────────────
+
+(ert-deftest repos/cycle-filter-wraps ()
+  "Cycling filter wraps from last to first."
+  (let ((workbench-repos--current-filter 'ahead))
+    (cl-letf (((symbol-function 'workbench-repos--redraw) #'ignore))
+      (workbench-repos-cycle-filter)
+      (should (eq workbench-repos--current-filter 'all)))))
+
+(ert-deftest repos/cycle-filter-advances ()
+  "Cycling filter moves to next."
+  (let ((workbench-repos--current-filter 'all))
+    (cl-letf (((symbol-function 'workbench-repos--redraw) #'ignore))
+      (workbench-repos-cycle-filter)
+      (should (eq workbench-repos--current-filter 'dirty)))))
+
+(ert-deftest repos/cycle-sort-wraps ()
+  "Cycling sort wraps from last to first."
+  (let ((workbench-repos--current-sort 'dirty))
+    (cl-letf (((symbol-function 'workbench-repos--redraw) #'ignore))
+      (workbench-repos-cycle-sort)
+      (should (eq workbench-repos--current-sort 'name)))))
+
+(ert-deftest repos/cycle-sort-advances ()
+  "Cycling sort moves to next."
+  (let ((workbench-repos--current-sort 'name))
+    (cl-letf (((symbol-function 'workbench-repos--redraw) #'ignore))
+      (workbench-repos-cycle-sort)
+      (should (eq workbench-repos--current-sort 'status)))))
+
+(ert-deftest repos/path-at-point-from-vtable ()
+  "path-at-point returns :path from vtable-current-object."
+  (cl-letf (((symbol-function 'vtable-current-object)
+             (lambda () '(:name "test" :path "/code/test" :branch "main"))))
+    (should (equal (workbench-repos--path-at-point) "/code/test"))))
+
+(ert-deftest repos/path-at-point-nil-when-no-object ()
+  "path-at-point returns nil when not on a vtable row."
+  (cl-letf (((symbol-function 'vtable-current-object)
+             (lambda () nil)))
+    (should (null (workbench-repos--path-at-point)))))
+
+(ert-deftest repos/filtered-view-applies-all-transforms ()
+  "filtered-view applies filter, search, and sort in sequence."
+  (let ((workbench-repos--statuses test-repos--sample-statuses)
+        (workbench-repos--current-filter 'dirty)
+        (workbench-repos--current-sort 'name)
+        (workbench-repos--current-search ""))
+    (let ((result (workbench-repos--filtered-view)))
+      (should (= (length result) 2))
+      (should (cl-every (lambda (r) (eq (plist-get r :state) 'dirty)) result)))))
+
+(ert-deftest repos/filtered-view-with-search ()
+  "filtered-view respects search term."
+  (let ((workbench-repos--statuses test-repos--sample-statuses)
+        (workbench-repos--current-filter 'all)
+        (workbench-repos--current-sort 'name)
+        (workbench-repos--current-search "gamma"))
+    (let ((result (workbench-repos--filtered-view)))
+      (should (= (length result) 1))
+      (should (equal (plist-get (car result) :name) "gamma")))))
+
 (provide 'test-repos)
 ;;; test-repos.el ends here
