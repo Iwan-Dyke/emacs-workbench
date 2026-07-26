@@ -166,6 +166,9 @@ test_startup_workspaces() {
 
     assert_true "files workspace exists" \
         '(not (null (+workspace-exists-p "files")))'
+
+    assert_true "repos workspace exists" \
+        '(not (null (+workspace-exists-p "repos")))'
 }
 
 test_command_centre() {

@@ -3,6 +3,7 @@
 (declare-function workbench/open-files "modules/tools/files")
 (declare-function workbench/open-files-full-frame "modules/tools/files")
 (declare-function workbench/open-default-ai-workspace "modules/workflows/ai")
+(declare-function workbench-repos-refresh "modules/workflows/repos")
 
 ;; Session startup: the workspaces a fresh daemon opens, and the persp-mode
 ;; tweaks that keep them stable. Composes the files browser (tools/files) and
@@ -48,6 +49,14 @@ Each step is wrapped in condition-case so a failure in one workspace
         (progn
           (+workspace-switch "files" t)
           (workbench/open-files))
+      (error nil))
+    ;; Repos workspace
+    (condition-case nil
+        (progn
+          (+workspace-switch "repos" t)
+          (workbench-repos-refresh)
+          (switch-to-buffer (get-buffer-create "*repos*"))
+          (delete-other-windows))
       (error nil))
     ;; Return to dashboard
     (+workspace-switch starting-workspace t)
