@@ -123,7 +123,19 @@ Launches at the project root so the agent sees the whole project."
                     (window-width . ,(workbench--ai-pane-window-width))))))
     (select-window window)
     (if (not needs-launch)
-        (workbench--vterm-resize buffer window)
+        ;; Existing buffer with live process — resize immediately AND after
+        ;; a brief delay. The immediate resize updates the pty, but the window
+        ;; may not have its final dimensions until after the display cycle.
+        (let ((buf buffer) (win window))
+          (workbench--vterm-resize buf win)
+          (run-at-time 0.05 nil
+                       (lambda ()
+                         (when (and (buffer-live-p buf) (window-live-p win))
+                           (workbench--vterm-resize buf win))))
+          (run-at-time 0.2 nil
+                       (lambda ()
+                         (when (and (buffer-live-p buf) (window-live-p win))
+                           (workbench--vterm-resize buf win)))))
       (let ((root (workbench--project-root)))
         (with-current-buffer buffer
           (setq default-directory root)
