@@ -69,8 +69,7 @@
           (workbench-repos--render-header repos)
           (workbench-repos--render-toolbar)
           (insert "\n")
-          (dolist (repo repos)
-            (workbench-repos--render-repo-line repo))
+          (workbench-repos--render-table repos)
           (insert "\n")
           (workbench-repos--render-footer)))
       (goto-char (point-min))
@@ -153,56 +152,81 @@
   (insert "\n")
   (workbench-repos--separator))
 
-(defun workbench-repos--render-repo-line (repo)
-  "Render a single REPO status line."
-  (let* ((name (plist-get repo :name))
-         (path (plist-get repo :path))
-         (branch (plist-get repo :branch))
-         (state (plist-get repo :state))
-         (dirty (plist-get repo :dirty))
-         (ahead (plist-get repo :ahead))
-         (behind (plist-get repo :behind))
-         (last-commit (plist-get repo :last-commit))
-         (stash (plist-get repo :stash))
-         (is-clean (eq state 'clean))
-         (state-face (if is-clean 'workbench-repos-clean 'workbench-repos-dirty))
-         (line-start (point)))
-    ;; Status pip
-    (insert "  "
-            (propertize "●" 'face state-face)
-            " ")
-    ;; Repo icon + name
-    (insert (workbench-repos--icon 'nerd-icons-octicon "nf-oct-repo" state-face)
-            " "
-            (propertize (truncate-string-to-width name 22 nil ?\s)
-                        'face 'workbench-repos-name)
-            " ")
-    ;; Branch (with icon)
-    (insert (workbench-repos--icon 'nerd-icons-devicon "nf-dev-git_branch" 'workbench-repos-branch)
-            " "
-            (propertize (truncate-string-to-width branch 22 nil ?\s)
-                        'face 'workbench-repos-branch)
-            " ")
-    ;; Status column — fixed width
-    (cond
-     (is-clean
-      (insert (propertize "  ✓ clean  " 'face 'workbench-repos-clean)))
-     (t
-      (insert (propertize (format " %2d changed " dirty) 'face 'workbench-repos-dirty))))
-    ;; Sync indicators
-    (let ((sync ""))
-      (when (> ahead 0)
-        (setq sync (concat sync (propertize (format "↑%d" ahead) 'face 'workbench-repos-dim) " ")))
-      (when (> behind 0)
-        (setq sync (concat sync (propertize (format "↓%d" behind) 'face 'workbench-repos-behind) " ")))
-      (when (and stash (> stash 0))
-        (setq sync (concat sync (propertize (format "⚑%d" stash) 'face 'workbench-repos-dim) " ")))
-      (insert (truncate-string-to-width (or sync "") 12 nil ?\s)))
-    ;; Last commit (right-aligned feel)
-    (insert (propertize (or last-commit "") 'face 'workbench-repos-dim))
-    (insert "\n")
-    ;; Apply path property to entire line for navigation
-    (put-text-property line-start (point) 'workbench-repos-path path)))
+(defun workbench-repos--render-table (repos)
+  "Render REPOS as a vtable."
+  (require 'vtable)
+  (make-vtable
+   :use-header-line nil
+   :face 'default
+   :separator-width 2
+   :objects repos
+   :actions '("RET" workbench-repos--action-open
+              "g" workbench-repos--action-magit)
+   :columns
+   (list
+    (list :name ""
+          :width 3
+          :getter (lambda (repo _table)
+                    (plist-get repo :state))
+          :formatter (lambda (state)
+                       (let ((face (if (eq state 'clean)
+                                       'workbench-repos-clean
+                                     'workbench-repos-dirty)))
+                         (propertize "●" 'face face))))
+    (list :name "Repository"
+          :width 24
+          :getter (lambda (repo _table)
+                    (plist-get repo :name))
+          :formatter (lambda (name)
+                       (propertize name 'face 'workbench-repos-name)))
+    (list :name "Branch"
+          :width 24
+          :getter (lambda (repo _table)
+                    (plist-get repo :branch))
+          :formatter (lambda (branch)
+                       (propertize branch 'face 'workbench-repos-branch)))
+    (list :name "Status"
+          :width 12
+          :getter (lambda (repo _table)
+                    (let ((state (plist-get repo :state))
+                          (dirty (plist-get repo :dirty)))
+                      (if (eq state 'clean) "✓ clean" (format "%d changed" dirty))))
+          :formatter (lambda (status)
+                       (if (string-prefix-p "✓" status)
+                           (propertize status 'face 'workbench-repos-clean)
+                         (propertize status 'face 'workbench-repos-dirty))))
+    (list :name "Sync"
+          :width 10
+          :getter (lambda (repo _table)
+                    (let ((ahead (plist-get repo :ahead))
+                          (behind (plist-get repo :behind))
+                          (stash (or (plist-get repo :stash) 0)))
+                      (concat
+                       (if (> ahead 0) (format "↑%d " ahead) "")
+                       (if (> behind 0) (format "↓%d " behind) "")
+                       (if (> stash 0) (format "⚑%d" stash) ""))))
+          :formatter (lambda (sync)
+                       (if (string-empty-p sync)
+                           ""
+                         (propertize sync 'face
+                                     (if (string-match-p "↓" sync)
+                                         'workbench-repos-behind
+                                       'workbench-repos-dim)))))
+    (list :name "Last Commit"
+          :width 12
+          :getter (lambda (repo _table)
+                    (or (plist-get repo :last-commit) ""))
+          :formatter (lambda (time)
+                       (propertize time 'face 'workbench-repos-dim))))))
+
+(defun workbench-repos--action-open (repo)
+  "Open REPO as a project workspace."
+  (workbench/open-project-workspace (plist-get repo :path)))
+
+(defun workbench-repos--action-magit (repo)
+  "Open magit for REPO."
+  (let ((default-directory (plist-get repo :path)))
+    (workbench/toggle-popup-magit)))
 
 (defun workbench-repos--render-footer ()
   "Render the keybinding footer."
@@ -318,7 +342,10 @@
 
 (defun workbench-repos--path-at-point ()
   "Return the repo path at point, or nil."
-  (get-text-property (line-beginning-position) 'workbench-repos-path))
+  (or (when (fboundp 'vtable-current-object)
+        (when-let ((obj (vtable-current-object)))
+          (plist-get obj :path)))
+      (get-text-property (line-beginning-position) 'workbench-repos-path)))
 
 (defun workbench-repos-open-project ()
   "Open the repo at point as a project workspace."
