@@ -128,17 +128,25 @@ From the Treemacs tree, return to the editing window."
     (define-key map "j" #'workbench/resize-down)
     (define-key map "k" #'workbench/resize-up)
     (define-key map "=" (lambda () (interactive) (balance-windows) (workbench--resize-message)))
+    (define-key map [t] #'workbench--resize-exit)
     map)
-  "Transient keymap for repeatable window resizing.")
+  "Transient keymap for repeatable window resizing.
+The [t] binding catches any key not explicitly bound, exiting resize mode.")
+
+(defun workbench--resize-exit ()
+  "Exit resize mode."
+  (interactive)
+  (setq overriding-terminal-local-map nil)
+  (message "Resize done"))
 
 (defun workbench/resize-mode ()
   "Enter a transient window-resize state.
 Tap h/l to adjust width and j/k to adjust height, repeatedly; = balances
-all windows; any other key (e.g. ESC) exits."
+all windows; any other key exits. Uses `overriding-terminal-local-map'
+so it works in all evil states including treemacs."
   (interactive)
   (workbench--resize-message)
-  (set-transient-map workbench-resize-map t
-                     (lambda () (message "Resize done"))))
+  (setq overriding-terminal-local-map workbench-resize-map))
 
 ;; Apply the profile default theme after all modules have loaded.
 (add-hook 'doom-init-ui-hook #'workbench--apply-default-theme)
