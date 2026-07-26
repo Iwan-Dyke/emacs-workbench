@@ -30,6 +30,8 @@ test:
       -l test/unit/test-mermaid.el \
       -l test/unit/test-bugs.el \
       -l test/unit/test-workflow-bugs.el \
+      -l test/unit/test-repos.el \
+      -l test/unit/test-repos-render.el \
       -f ert-run-tests-batch-and-exit
 
 test-behaviour profile="work":

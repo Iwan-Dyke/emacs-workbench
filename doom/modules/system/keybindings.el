@@ -8,7 +8,8 @@
        :desc "Show default AI tool" "a" #'workbench/show-default-ai-tool
        :desc "Open startup workspaces" "s" #'workbench/open-startup-workspaces
        :desc "Resize windows" "r" #'workbench/resize-mode
-       :desc "Switch theme" "t" #'workbench/switch-theme)
+       :desc "Switch theme" "t" #'workbench/switch-theme
+       :desc "Repos dashboard" "g" #'workbench/open-repos)
 
       (:prefix-map ("n" . "notes")
        :desc "Open agenda" "a" #'workbench-org/open-agenda

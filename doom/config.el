@@ -11,6 +11,7 @@
 (load! "modules/tools/jira")
 (load! "modules/workflows/coding")
 (load! "modules/workflows/project-dashboard")
+(load! "modules/workflows/repos")
 (load! "modules/workflows/ai")
 (load! "modules/workflows/org")
 (load! "modules/workflows/session")

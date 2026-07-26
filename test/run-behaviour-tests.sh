@@ -711,6 +711,59 @@ test_additional_keybindings() {
         "workbench/open-project-workspace-dwim"
 }
 
+test_repos_workspace() {
+    info "── Repos Workspace ──"
+
+    # SPC w g keybinding exists
+    assert_equal "SPC w g → open-repos" \
+        '(lookup-key doom-leader-map "wg")' \
+        "workbench/open-repos"
+
+    # Function exists and is interactive
+    assert_true "workbench/open-repos is a command" \
+        '(commandp #'"'"'workbench/open-repos)'
+
+    # Open repos workspace (scanning may take a few seconds)
+    local result
+    local saved_timeout="$TIMEOUT"
+    TIMEOUT=15
+    result=$(eval_or_fail "open repos workspace" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (condition-case err
+          (progn (workbench/open-repos) "ok")
+          (error (format "ERROR: %S" err))))') || { TIMEOUT="$saved_timeout"; return; }
+    TIMEOUT="$saved_timeout"
+
+    if [[ "$result" == '"ok"' ]]; then
+        pass "repos workspace opens"
+    else
+        fail "repos workspace opens (got: $result)"
+        return
+    fi
+
+    sleep 2
+
+    # Buffer exists and is in correct mode
+    assert_true "repos buffer exists" \
+        '(buffer-live-p (get-buffer "*repos*"))'
+
+    assert_equal "repos buffer mode" \
+        '(with-current-buffer "*repos*" major-mode)' \
+        "workbench-repos-mode"
+
+    assert_equal "repos buffer evil state is normal" \
+        '(with-current-buffer "*repos*" evil-state)' \
+        "normal"
+
+    # Buffer has content (repos found under ~/code)
+    assert_true "repos buffer has content" \
+        '(> (with-current-buffer "*repos*" (buffer-size)) 50)'
+
+    # Buffer is read-only
+    assert_not_nil "repos buffer is read-only" \
+        '(with-current-buffer "*repos*" buffer-read-only)'
+}
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 trap cleanup EXIT
@@ -741,6 +794,7 @@ test_popup_terminal
 test_popup_magit
 test_full_layout
 test_project_dashboard
+test_repos_workspace
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 
