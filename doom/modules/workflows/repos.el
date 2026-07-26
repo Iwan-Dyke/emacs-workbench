@@ -289,6 +289,21 @@
     "j" #'next-line
     "k" #'previous-line))
 
+;; Disable evil-snipe in repos-mode — snipe intercepts s/f/S/F which we
+;; use for sort/filter. Without this, pressing s runs evil-snipe-s instead
+;; of workbench-repos-cycle-sort.
+(add-hook 'workbench-repos-mode-hook
+          (lambda ()
+            (when (bound-and-true-p evil-snipe-local-mode)
+              (evil-snipe-local-mode -1))
+            (when (bound-and-true-p evil-snipe-override-local-mode)
+              (evil-snipe-override-local-mode -1))
+            ;; Belt and braces: force our bindings into the state-local map
+            ;; in case snipe re-enables via a hook.
+            (when (fboundp 'evil-local-set-key)
+              (evil-local-set-key 'normal "s" #'workbench-repos-cycle-sort)
+              (evil-local-set-key 'normal "f" #'workbench-repos-cycle-filter))))
+
 ;;; ── Commands ───────────────────────────────────────────────────────────────
 
 (defun workbench-repos--roots ()

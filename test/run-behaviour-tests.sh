@@ -809,13 +809,19 @@ test_repos_workspace() {
            (substring-no-properties (symbol-name workbench-repos--current-filter)))' \
         '"dirty"'
 
-    # Sort cycle works
+    # Sort cycle works (s key not intercepted by evil-snipe)
     assert_equal "sort cycles to status" \
         '(with-current-buffer "*repos*"
            (setq workbench-repos--current-sort '"'"'name)
            (workbench-repos-cycle-sort)
            (substring-no-properties (symbol-name workbench-repos--current-sort)))' \
         '"status"'
+
+    # s key resolves to our sort command, not evil-snipe
+    assert_equal "s key bound to cycle-sort not snipe" \
+        '(with-current-buffer "*repos*"
+           (key-binding "s"))' \
+        "workbench-repos-cycle-sort"
 
     # path-at-point returns a path on data row
     assert_not_nil "path-at-point works on data row" \
