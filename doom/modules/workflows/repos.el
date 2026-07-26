@@ -84,39 +84,74 @@
   (insert "  Configure roots in profiles/local.el:\n")
   (insert "    (setq workbench-repos-roots '(\"~/code/\"))\n"))
 
+(defun workbench-repos--icon (fn name &optional face)
+  "Call nerd-icons FN with NAME, applying FACE. Empty string if unavailable."
+  (if (fboundp fn)
+      (let ((icon (funcall fn name)))
+        (if face (propertize icon 'face face) icon))
+    ""))
+
+(defun workbench-repos--separator ()
+  "Insert a visual separator."
+  (insert "  " (propertize "────────────────────────────────────────────────────────────────\n"
+                            'face 'shadow)))
+
 (defun workbench-repos--render-header (repos)
   "Render the summary header for REPOS."
   (let* ((total (length repos))
          (dirty (cl-count-if (lambda (r) (eq (plist-get r :state) 'dirty)) repos))
+         (clean (- total dirty))
          (behind (cl-count-if (lambda (r) (> (plist-get r :behind) 0)) repos))
-         (ahead (cl-count-if (lambda (r) (> (plist-get r :ahead) 0)) repos)))
+         (ahead (cl-count-if (lambda (r) (> (plist-get r :ahead) 0)) repos))
+         (stashed (cl-count-if (lambda (r) (> (or (plist-get r :stash) 0) 0)) repos)))
     (insert "\n")
-    (insert "  " (propertize "REPOS" 'face '(:weight bold :height 1.2)) "  ")
-    (insert (propertize (format "%d repos" total) 'face 'default))
+    (insert "  "
+            (workbench-repos--icon 'nerd-icons-octicon "nf-oct-repo" 'font-lock-keyword-face)
+            " "
+            (propertize "REPOS" 'face '(:weight bold :height 1.3))
+            "\n\n")
+    ;; Stats line with icons
+    (insert "  "
+            (propertize (format "%d" total) 'face '(:weight bold))
+            (propertize " repos" 'face 'shadow)
+            "   "
+            (workbench-repos--icon 'nerd-icons-octicon "nf-oct-check" 'workbench-repos-clean)
+            " " (propertize (format "%d clean" clean) 'face 'workbench-repos-clean))
     (when (> dirty 0)
-      (insert "  " (propertize (format "%d dirty" dirty) 'face 'workbench-repos-dirty)))
+      (insert "   "
+              (workbench-repos--icon 'nerd-icons-octicon "nf-oct-dot_fill" 'workbench-repos-dirty)
+              " " (propertize (format "%d dirty" dirty) 'face 'workbench-repos-dirty)))
     (when (> behind 0)
-      (insert "  " (propertize (format "%d behind" behind) 'face 'workbench-repos-behind)))
+      (insert "   "
+              (workbench-repos--icon 'nerd-icons-codicon "nf-cod-arrow_down" 'workbench-repos-behind)
+              " " (propertize (format "%d behind" behind) 'face 'workbench-repos-behind)))
     (when (> ahead 0)
-      (insert "  " (propertize (format "%d ahead" ahead) 'face 'workbench-repos-dim)))
-    (insert "\n")))
+      (insert "   "
+              (workbench-repos--icon 'nerd-icons-codicon "nf-cod-arrow_up" 'workbench-repos-dim)
+              " " (propertize (format "%d ahead" ahead) 'face 'workbench-repos-dim)))
+    (when (> stashed 0)
+      (insert "   "
+              (workbench-repos--icon 'nerd-icons-octicon "nf-oct-archive" 'workbench-repos-dim)
+              " " (propertize (format "%d stashed" stashed) 'face 'workbench-repos-dim)))
+    (insert "\n\n")))
 
 (defun workbench-repos--render-toolbar ()
   "Render the filter/sort toolbar."
   (insert "  "
-          (propertize "Filter:" 'face 'shadow) " "
-          (propertize (symbol-name workbench-repos--current-filter)
+          (workbench-repos--icon 'nerd-icons-mdicon "nf-md-filter" 'shadow) " "
+          (propertize (capitalize (symbol-name workbench-repos--current-filter))
                       'face 'font-lock-keyword-face)
-          "  "
-          (propertize "Sort:" 'face 'shadow) " "
-          (propertize (symbol-name workbench-repos--current-sort)
+          "    "
+          (workbench-repos--icon 'nerd-icons-mdicon "nf-md-sort" 'shadow) " "
+          (propertize (capitalize (symbol-name workbench-repos--current-sort))
                       'face 'font-lock-keyword-face))
   (when (not (string-empty-p workbench-repos--current-search))
-    (insert "  "
-            (propertize "Search:" 'face 'shadow) " "
+    (insert "    "
+            (workbench-repos--icon 'nerd-icons-mdicon "nf-md-magnify" 'shadow) " "
             (propertize workbench-repos--current-search
                         'face 'font-lock-keyword-face)))
-  (insert "\n"))
+  (insert "\n")
+  (workbench-repos--separator))
 
 (defun workbench-repos--render-repo-line (repo)
   "Render a single REPO status line."
@@ -129,28 +164,41 @@
          (behind (plist-get repo :behind))
          (last-commit (plist-get repo :last-commit))
          (stash (plist-get repo :stash))
-         (state-face (if (eq state 'clean) 'workbench-repos-clean 'workbench-repos-dirty))
-         (pip (if (eq state 'clean) "●" "●"))
+         (is-clean (eq state 'clean))
+         (state-face (if is-clean 'workbench-repos-clean 'workbench-repos-dirty))
          (line-start (point)))
     ;; Status pip
-    (insert "  " (propertize pip 'face state-face) " ")
-    ;; Repo name (padded)
-    (insert (propertize (truncate-string-to-width name 25) 'face 'workbench-repos-name) " ")
-    ;; Branch
-    (insert (propertize (truncate-string-to-width branch 25) 'face 'workbench-repos-branch) " ")
-    ;; Status indicators
-    (if (eq state 'clean)
-        (insert (propertize "✓" 'face 'workbench-repos-clean) " ")
-      (insert (propertize (format "%d changed" dirty) 'face 'workbench-repos-dirty) " "))
-    ;; Ahead/behind
-    (when (> ahead 0)
-      (insert (propertize (format "↑%d" ahead) 'face 'workbench-repos-dim) " "))
-    (when (> behind 0)
-      (insert (propertize (format "↓%d" behind) 'face 'workbench-repos-behind) " "))
-    ;; Stash
-    (when (and stash (> stash 0))
-      (insert (propertize (format "⚑%d" stash) 'face 'workbench-repos-dim) " "))
-    ;; Last commit
+    (insert "  "
+            (propertize "●" 'face state-face)
+            " ")
+    ;; Repo icon + name
+    (insert (workbench-repos--icon 'nerd-icons-octicon "nf-oct-repo" state-face)
+            " "
+            (propertize (truncate-string-to-width name 22 nil ?\s)
+                        'face 'workbench-repos-name)
+            " ")
+    ;; Branch (with icon)
+    (insert (workbench-repos--icon 'nerd-icons-devicon "nf-dev-git_branch" 'workbench-repos-branch)
+            " "
+            (propertize (truncate-string-to-width branch 22 nil ?\s)
+                        'face 'workbench-repos-branch)
+            " ")
+    ;; Status column — fixed width
+    (cond
+     (is-clean
+      (insert (propertize "  ✓ clean  " 'face 'workbench-repos-clean)))
+     (t
+      (insert (propertize (format " %2d changed " dirty) 'face 'workbench-repos-dirty))))
+    ;; Sync indicators
+    (let ((sync ""))
+      (when (> ahead 0)
+        (setq sync (concat sync (propertize (format "↑%d" ahead) 'face 'workbench-repos-dim) " ")))
+      (when (> behind 0)
+        (setq sync (concat sync (propertize (format "↓%d" behind) 'face 'workbench-repos-behind) " ")))
+      (when (and stash (> stash 0))
+        (setq sync (concat sync (propertize (format "⚑%d" stash) 'face 'workbench-repos-dim) " ")))
+      (insert (truncate-string-to-width (or sync "") 12 nil ?\s)))
+    ;; Last commit (right-aligned feel)
     (insert (propertize (or last-commit "") 'face 'workbench-repos-dim))
     (insert "\n")
     ;; Apply path property to entire line for navigation
@@ -158,7 +206,8 @@
 
 (defun workbench-repos--render-footer ()
   "Render the keybinding footer."
-  (insert "  "
+  (workbench-repos--separator)
+  (insert "\n  "
           (propertize "[r]" 'face 'font-lock-keyword-face) "efresh  "
           (propertize "[f]" 'face 'font-lock-keyword-face) "ilter  "
           (propertize "[s]" 'face 'font-lock-keyword-face) "ort  "

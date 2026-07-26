@@ -239,7 +239,7 @@
     (let ((buf (workbench-repos--render test-repos-render--sample)))
       (unwind-protect
           (with-current-buffer buf
-            (should (string-match-p "Search:.*sifft" (buffer-string))))
+            (should (string-match-p "sifft" (buffer-string))))
         (kill-buffer buf)))))
 
 (ert-deftest repos-render/long-branch-truncated ()
