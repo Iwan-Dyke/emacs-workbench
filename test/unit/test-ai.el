@@ -266,4 +266,55 @@ This is correct behaviour (ensures full-frame), documenting it."
             (should resize-called))
         (kill-buffer buf)))))
 
+;;; ── Resize on re-open ──────────────────────────────────────────────────────
+
+(ert-deftest ai-pane/reopen-triggers-deferred-resize ()
+  "Re-opening a pane with live process schedules deferred resizes."
+  (let ((resize-count 0)
+        (timer-delays '())
+        (buf (get-buffer-create "*project-kiro:main*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'workbench--project-root) (lambda () "/tmp/"))
+                  ((symbol-function 'workbench--project-ai-window) (lambda () nil))
+                  ((symbol-function 'workbench--ai-pane-window-width) (lambda () 60))
+                  ((symbol-function 'display-buffer) (lambda (b _) (selected-window)))
+                  ((symbol-function 'select-window) #'ignore)
+                  ((symbol-function 'workbench--vterm-resize)
+                   (lambda (_b _w) (cl-incf resize-count)))
+                  ((symbol-function 'get-buffer-process) (lambda (_) t))
+                  ((symbol-function 'run-at-time)
+                   (lambda (delay _repeat fn)
+                     (push delay timer-delays)
+                     (funcall fn)
+                     nil)))
+          (workbench--show-project-ai "kiro")
+          ;; Should have: 1 immediate + 2 deferred = 3 resizes
+          (should (= resize-count 3))
+          ;; Deferred timers at 0.05 and 0.2 seconds
+          (should (member 0.05 timer-delays))
+          (should (member 0.2 timer-delays)))
+      (kill-buffer buf))))
+
+(ert-deftest ai-pane/reopen-does-not-relaunch-process ()
+  "Re-opening a pane with live process does NOT launch vterm-mode or send commands."
+  (let ((vterm-mode-called nil)
+        (send-called nil)
+        (buf (get-buffer-create "*project-claude:main*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'workbench--project-root) (lambda () "/tmp/"))
+                  ((symbol-function 'workbench--project-ai-window) (lambda () nil))
+                  ((symbol-function 'workbench--ai-pane-window-width) (lambda () 60))
+                  ((symbol-function 'display-buffer) (lambda (b _) (selected-window)))
+                  ((symbol-function 'select-window) #'ignore)
+                  ((symbol-function 'workbench--vterm-resize) #'ignore)
+                  ((symbol-function 'get-buffer-process) (lambda (_) t))
+                  ((symbol-function 'run-at-time) (lambda (&rest _) nil))
+                  ((symbol-function 'vterm-mode) (lambda () (setq vterm-mode-called t)))
+                  ((symbol-function 'vterm-send-string) (lambda (&rest _) (setq send-called t)))
+                  ((symbol-function 'vterm-send-return) (lambda () (setq send-called t))))
+          (workbench--show-project-ai "claude")
+          (should-not vterm-mode-called)
+          (should-not send-called))
+      (kill-buffer buf))))
+
 ;;; test-ai.el ends here

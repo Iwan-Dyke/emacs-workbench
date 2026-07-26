@@ -465,6 +465,56 @@ test_ai_workspace() {
     # The AI buffer should be named after the default tool
     assert_not_nil "ai workspace buffer named for default tool" \
         '(get-buffer (format "*%s*" workbench/default-ai-tool))'
+
+    # Test project AI pane toggle and resize on re-open
+    eval_or_fail "setup project workspace for AI pane test" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "ai-test" t)
+        (setq default-directory "/Users/iwandyke/code/emacs-workbench/")
+        t)' >/dev/null
+
+    sleep 1
+
+    # Toggle AI pane on
+    local ai_result
+    ai_result=$(eval_or_fail "toggle AI pane on" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "ai-test")
+        (condition-case err
+          (progn (workbench/toggle-project-ai) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$ai_result" == '"ok"' ]]; then
+        pass "AI pane toggle on succeeds"
+    else
+        fail "AI pane toggle on (got: $ai_result)"
+        return
+    fi
+
+    sleep 2
+
+    # Toggle off
+    eval_or_fail "toggle AI pane off" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "ai-test")
+        (workbench/toggle-project-ai)
+        t)' >/dev/null
+
+    sleep 1
+
+    # Toggle back on — this is the re-open path that triggers deferred resize
+    ai_result=$(eval_or_fail "toggle AI pane back on (re-open)" '
+      (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
+        (+workspace-switch "ai-test")
+        (condition-case err
+          (progn (workbench/toggle-project-ai) "ok")
+          (error (format "ERROR: %S" err))))') || return
+
+    if [[ "$ai_result" == '"ok"' ]]; then
+        pass "AI pane re-open succeeds"
+    else
+        fail "AI pane re-open (got: $ai_result)"
+    fi
 }
 
 test_org_integration() {
