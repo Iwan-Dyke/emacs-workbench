@@ -344,15 +344,15 @@
 ;;; ── Entry point ────────────────────────────────────────────────────────────
 
 (defun workbench/open-repos ()
-  "Open the repos workspace dashboard."
+  "Open the repos dashboard in its own workspace."
   (interactive)
+  (+workspace-switch "repos" t)
   (let ((buf (get-buffer workbench-repos--buffer-name)))
     (if (and buf (buffer-live-p buf) workbench-repos--statuses)
-        ;; Already have data — show existing buffer
         (switch-to-buffer buf)
-      ;; First open or stale — scan
       (workbench-repos-refresh)
-      (switch-to-buffer (get-buffer workbench-repos--buffer-name)))))
+      (switch-to-buffer (get-buffer workbench-repos--buffer-name))))
+  (delete-other-windows))
 
 (provide 'workbench-repos)
 ;;; repos.el ends here
