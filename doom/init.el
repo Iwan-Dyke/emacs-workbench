@@ -8,6 +8,7 @@
        :ui
        doom
        dashboard
+       hl-line
        modeline
        treemacs
        workspaces

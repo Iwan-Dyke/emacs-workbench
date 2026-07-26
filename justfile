@@ -32,6 +32,7 @@ test:
       -l test/unit/test-workflow-bugs.el \
       -l test/unit/test-repos.el \
       -l test/unit/test-repos-render.el \
+      -l test/unit/test-visual.el \
       -f ert-run-tests-batch-and-exit
 
 test-behaviour profile="work":

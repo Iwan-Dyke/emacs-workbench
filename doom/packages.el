@@ -4,3 +4,5 @@
 (package! org-roam)
 (package! ob-mermaid)
 (package! mermaid-mode)
+(package! lin)
+(package! org-modern)

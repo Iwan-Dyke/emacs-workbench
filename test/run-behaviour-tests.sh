@@ -714,6 +714,30 @@ test_additional_keybindings() {
         "workbench/open-project-workspace-dwim"
 }
 
+test_visual_enhancements() {
+    info "── Visual Enhancements ──"
+
+    # Lin is available
+    assert_true "lin-mode is a function" \
+        '(fboundp #'"'"'lin-mode)'
+
+    # org-modern is available
+    assert_true "org-modern is available" \
+        '(fboundp #'"'"'global-org-modern-mode)'
+
+    # org-modern-star is configured
+    assert_not_nil "org-modern-star set" \
+        '(bound-and-true-p org-modern-star)'
+
+    # Agenda block separator is configured
+    assert_not_nil "agenda block separator configured" \
+        '(bound-and-true-p org-agenda-block-separator)'
+
+    # hl-line module is active (Doom :ui hl-line)
+    assert_true "global-hl-line-mode active" \
+        '(bound-and-true-p global-hl-line-mode)'
+}
+
 test_repos_workspace() {
     info "── Repos Workspace ──"
 
@@ -797,6 +821,7 @@ test_popup_terminal
 test_popup_magit
 test_full_layout
 test_project_dashboard
+test_visual_enhancements
 test_repos_workspace
 
 # ── Summary ──────────────────────────────────────────────────────────────────
