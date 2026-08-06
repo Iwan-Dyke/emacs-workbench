@@ -39,23 +39,23 @@
    (cyan       '("#33ffcc" "#46D9FF"   "brightcyan"   ))
    (dark-cyan  '("#00804d" "#5699AF"   "cyan"         ))
 
-   ;; Syntax classes — everything green-shifted
+   ;; Syntax classes — phosphor glow hierarchy (bright → dim)
    (highlight    green)
    (vertical-bar (doom-darken base3 0.2))
-   (selection    dark-blue)
-   (builtin      green)
-   (comments     base5)
-   (doc-comments base6)
-   (constants    teal)
-   (functions    fg)
-   (keywords     green)
+   (selection    '("#1a4a1a" "#005f00"   "green"        ))
+   (builtin      '("#33ff66" "#00ff00"   "green"        ))  ; bright phosphor
+   (comments     base5)                                      ; bumped from base4 for readability
+   (doc-comments base6)                                      ; bumped from base5
+   (constants    '("#00ffcc" "#00ff00"   "cyan"         ))  ; distinct cyan-green
+   (functions    '("#66ff99" "#00ff00"   "green"        ))  ; bright — active phosphor
+   (keywords     '("#00ff41" "#00ff00"   "green"        ))  ; full intensity phosphor
    (methods      cyan)
-   (operators    base7)
-   (type         yellow)
-   (strings      teal)
-   (variables    base8)
-   (numbers      orange)
-   (region       `(,(doom-lighten (car bg-alt) 0.15) ,@(doom-lighten (cdr base1) 0.35)))
+   (operators    base7)                                      ; bumped from base6
+   (type         '("#99ffbb" "#00ff00"   "green"        ))  ; lighter green — structure
+   (strings      '("#00cc88" "#00ff00"   "green"        ))  ; teal-green — data
+   (variables    '("#b0ffb0" "#dfdfdf"   "white"        ))  ; pale green — max phosphor
+   (numbers      '("#33ffaa" "#00ff00"   "green"        ))  ; mint — literals
+   (region       `(,(doom-lighten (car base3) 0.4) ,@(doom-lighten (cdr base1) 0.35)))
    (error        red)
    (warning      yellow)
    (success      green)
@@ -82,7 +82,27 @@
    (doom-modeline-buffer-file :inherit 'mode-line-buffer-id :weight 'bold)
    (treemacs-root-face :foreground green :weight 'bold :height 1.1)
    (treemacs-git-modified-face :foreground yellow)
-   (treemacs-git-added-face :foreground green))
+   (treemacs-git-added-face :foreground green)
+   ;; Selection/highlight — visible green band on black
+   (highlight :background base3 :foreground fg)
+   (region :background base3)
+   ;; Vertico/minibuffer — the workspace switcher, file picker, etc.
+   (vertico-current :background base3 :foreground fg :weight 'bold)
+   (completions-common-part :foreground green :weight 'bold)
+   (completions-first-difference :foreground cyan)
+   (orderless-match-face-0 :foreground green :weight 'bold)
+   (orderless-match-face-1 :foreground cyan :weight 'bold)
+   (orderless-match-face-2 :foreground violet :weight 'bold)
+   (orderless-match-face-3 :foreground yellow :weight 'bold)
+   ;; Doom workspace tab bar
+   (+workspace-tab-selected-face :background base3 :foreground green :weight 'bold)
+   (+workspace-tab-face :foreground base6)
+   ;; Which-key popup
+   (which-key-key-face :foreground green :weight 'bold)
+   (which-key-command-description-face :foreground fg)
+   (which-key-group-description-face :foreground cyan)
+   ;; Font
+   (default :family "Share Tech Mono" :height 140 :foreground fg :background bg))
 
   ;;;; Variable overrides
   ())
