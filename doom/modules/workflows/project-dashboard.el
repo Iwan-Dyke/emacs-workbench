@@ -8,7 +8,7 @@
 (declare-function workbench/open-files "modules/tools/files")
 (declare-function workbench/open-project-tree "modules/tools/files")
 (declare-function workbench/toggle-project-ai "modules/workflows/ai")
-(declare-function workbench--project-identity-name "modules/workflows/coding")
+
 
 (load! "project-dashboard-data")
 (load! "project-dashboard-render")
@@ -85,8 +85,8 @@ re-collection."
 (defun workbench/open-project-dashboard (directory)
   "Open the project intelligence dashboard for DIRECTORY."
   (let* ((project-directory (file-truename directory))
-         (project-identity (workbench--project-identity-name project-directory))
-         (buffer (get-buffer-create (format "*workbench:%s*" project-identity)))
+         (workspace-name (+workspace-current-name))
+         (buffer (get-buffer-create (format "*workbench:%s*" workspace-name)))
          (data (workbench--dashboard-collect project-directory))
          (overview (plist-get data :overview))
          (git (plist-get data :git))

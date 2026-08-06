@@ -7,6 +7,7 @@
 (declare-function workbench--treemacs-display "modules/tools/files")
 (declare-function workbench/open-project-dashboard "modules/workflows/project-dashboard")
 (declare-function workbench--show-project-ai "modules/workflows/ai")
+(declare-function workbench--project-ai-window "modules/workflows/ai")
 
 (defun workbench--project-identity-name (directory)
   "Return a workspace name for DIRECTORY: the bare directory name.
@@ -115,6 +116,35 @@ workspace switch."
       (workbench/open-selected-path-as-project-workspace)
     (call-interactively #'workbench/open-project-workspace)))
 
+(defun workbench--full-layout-active-p (directory)
+  "Return non-nil if the current workspace already has the full coding layout.
+Checks that Treemacs is visible, the project dashboard buffer exists and is
+displayed, and an AI pane is visible — all for DIRECTORY."
+  (and (workbench--treemacs-window)
+       (let ((dashboard-buf (get-buffer (format "*workbench:%s*"
+                                                (+workspace-current-name)))))
+         (and dashboard-buf
+              (get-buffer-window dashboard-buf (selected-frame))))
+       (workbench--project-ai-window)))
+
+(defun workbench--select-main-window ()
+  "Select the main editing window (largest non-Treemacs, non-AI window).
+Falls back to `other-window 1' from Treemacs if heuristic fails."
+  (let ((tree-win (workbench--treemacs-window))
+        (ai-win (workbench--project-ai-window))
+        (best nil)
+        (best-area 0))
+    (dolist (win (window-list (selected-frame) 'no-minibuf))
+      (unless (or (eq win tree-win) (eq win ai-win))
+        (let ((area (* (window-total-width win) (window-total-height win))))
+          (when (> area best-area)
+            (setq best win best-area area)))))
+    (if best
+        (select-window best)
+      ;; Fallback: if treemacs is selected, move one window right
+      (when (eq (selected-window) tree-win)
+        (other-window 1)))))
+
 (defun workbench/open-project-workspace-full-layout ()
   "Open a project workspace with the full coding layout: Treemacs | Code | AI.
 From Dired/Dirvish, uses the selected path. Otherwise prompts.
@@ -123,24 +153,36 @@ Creates or switches to the workspace, then builds the three-pane layout:
   - Project dashboard in the centre
   - Profile default AI pane on the right
 
+When called repeatedly for an already-open workspace that has the full layout
+intact, simply switches to that workspace without rebuilding.
+
 This is the one-shot equivalent of: SPC p o → SPC e → SPC t c/k."
   (interactive)
-  ;; Step 1: open or switch to the workspace (reuses existing logic)
+  ;; Step 1: resolve the target directory
   (let ((directory (if (derived-mode-p 'dired-mode)
                        (workbench--project-directory-for-path
                         (workbench--selected-path))
                      (read-directory-name "Project directory: "))))
+    ;; Step 2: open or switch to the workspace
     (let ((workbench--suppress-initial-dashboard t))
       (workbench/open-project-workspace directory))
-    ;; Step 2: clear any existing layout and build fresh.
-    ;; ignore-window-parameters ensures side windows (treemacs) are also removed.
-    (let ((ignore-window-parameters t))
-      (delete-other-windows))
-    ;; Step 3: open Treemacs on the left
-    (workbench--treemacs-display directory)
-    ;; Step 4: select the main editing window (right of Treemacs)
-    (other-window 1)
-    ;; Step 5: show the project dashboard in the centre
-    (workbench/open-project-dashboard directory)
-    ;; Step 6: open the AI pane on the right
-    (workbench--show-project-ai workbench/default-ai-tool)))
+    ;; Step 3: if the layout is already intact, just focus the main window
+    (if (workbench--full-layout-active-p directory)
+        (workbench--select-main-window)
+      ;; Step 4: build the layout from scratch
+      ;; Clear any existing windows — ignore-window-parameters ensures side
+      ;; windows (treemacs) are also removed.
+      (let ((ignore-window-parameters t))
+        (delete-other-windows))
+      ;; Step 5: open Treemacs on the left
+      (workbench--treemacs-display directory)
+      ;; Step 6: select the main editing window (right of Treemacs)
+      (workbench--select-main-window)
+      ;; Safety: if we're still in a dedicated window (treemacs init failed to
+      ;; create a second window), create one so switch-to-buffer can work.
+      (when (window-dedicated-p)
+        (select-window (split-window-right)))
+      ;; Step 7: show the project dashboard in the centre
+      (workbench/open-project-dashboard directory)
+      ;; Step 8: open the AI pane on the right
+      (workbench--show-project-ai workbench/default-ai-tool))))
