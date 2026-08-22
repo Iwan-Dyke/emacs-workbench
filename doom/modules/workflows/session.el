@@ -122,8 +122,13 @@ Runs from `post-command-hook' in Dired buffers but defers the actual work
 to an idle timer so rapid j/k navigation doesn't do redundant work."
   (when workbench--files-track-timer
     (cancel-timer workbench--files-track-timer))
-  (setq workbench--files-track-timer
-        (run-with-idle-timer 0.15 nil #'workbench--files-track-point-now)))
+  (let ((buf (current-buffer)))
+    (setq workbench--files-track-timer
+          (run-with-idle-timer 0.15 nil
+                               (lambda ()
+                                 (when (buffer-live-p buf)
+                                   (with-current-buffer buf
+                                     (workbench--files-track-point-now))))))))
 
 (defun workbench--files-track-point-now ()
   "Record the files workspace's current directory and file at point."
