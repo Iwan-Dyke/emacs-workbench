@@ -162,13 +162,13 @@
     (goto-char (point-min))
     (should (workbench-org--stale-skip))))
 
-(ert-deftest org/stale-skip-skips-unparseable ()
-  "Entries with unparseable UPDATED are skipped."
+(ert-deftest org/stale-skip-shows-unparseable ()
+  "Entries with unparseable UPDATED are shown (not skipped) so user can investigate."
   (with-temp-buffer
     (org-mode)
     (insert "* TODO X-4 Relative\n:PROPERTIES:\n:UPDATED: 2 hours ago\n:END:\n")
     (goto-char (point-min))
-    (should (workbench-org--stale-skip))))
+    (should-not (workbench-org--stale-skip))))
 
 (ert-deftest org/weeknote-path-format ()
   "Weeknote path uses weeknotes/YYYY-WNN.org format."

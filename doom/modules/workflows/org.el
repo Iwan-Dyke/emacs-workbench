@@ -92,13 +92,15 @@ When called from the refresh hook, the cache is already fresh."
 ;; The stale view needs a custom skip function that checks UPDATED property.
 ;; This is a simple approach — if the UPDATED value is within 14 days, skip it.
 (defun workbench-org--stale-skip ()
-  "Skip entry if UPDATED property is within 14 days, unparseable, or missing."
+  "Skip entry if UPDATED property is within 14 days or missing.
+Entries with unparseable dates (e.g. relative strings from jira-cli) are NOT
+skipped — they appear in the stale view so the user can investigate."
   (let ((updated (org-entry-get nil "UPDATED")))
     (if updated
         (let ((days (workbench-jira-days-since-update updated)))
-          (if (or (null days) (< days 14))
-              (org-end-of-subtree t)  ; skip: unknown age or recently updated
-            nil))  ; don't skip: genuinely stale
+          (if (and days (< days 14))
+              (org-end-of-subtree t)  ; skip: recently updated
+            nil))  ; don't skip: genuinely stale OR unparseable (show both)
       (org-end-of-subtree t))))
 
 (after! org
@@ -153,11 +155,13 @@ When called from the refresh hook, the cache is already fresh."
   "Root directory to scan for repos containing design_decisions/.")
 
 (defun workbench-org--adr-repos ()
-  "Return list of directories under `workbench-org-adr-scan-root' with design_decisions/."
+  "Return list of directories under `workbench-org-adr-scan-root' with design_decisions/.
+Skips symlinks to prevent traversal into unexpected locations."
   (let ((root (expand-file-name workbench-org-adr-scan-root)))
     (when (file-directory-p root)
       (seq-filter (lambda (d)
-                    (file-directory-p (expand-file-name "design_decisions" d)))
+                    (and (not (file-symlink-p d))
+                         (file-directory-p (expand-file-name "design_decisions" d))))
                   (directory-files root t "^[^.]" t)))))
 
 (defun workbench-org--adr-files (repo-dir)
@@ -200,11 +204,9 @@ org-roam-db-sync when at least one file was updated."
         (dolist (adr-file adr-files)
           (let* ((filename (file-name-nondirectory adr-file))
                  (node-id (workbench-org--adr-node-id repo-name filename))
-                 (title (workbench-org--adr-title adr-file))
-                 (stale (not (file-exists-p adr-file))))
-            (push (concat "* " title
-                          (if stale " :STALE:" "")
-                          "\n:PROPERTIES:\n"
+                 (title (workbench-org--adr-title adr-file)))
+            (push (concat "* " title "\n"
+                          ":PROPERTIES:\n"
                           ":ID: " node-id "\n"
                           ":TYPE: Decision\n"
                           ":SOURCE: " adr-file "\n"
