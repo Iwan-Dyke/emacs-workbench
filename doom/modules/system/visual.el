@@ -5,6 +5,8 @@
 ;;   - org-modern: clean org headings, tags, timestamps in agenda
 ;;   - hl-line: enabled in custom dashboard/list modes
 
+(defvar workbench/profile)  ; defined in system/core.el
+
 ;;; ── Lin (enhanced hl-line for list buffers) ────────────────────────────────
 
 (after! lin

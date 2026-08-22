@@ -18,7 +18,7 @@
        :desc "Insert link" "i" #'org-roam-node-insert
        :desc "Backlinks" "b" #'org-roam-buffer-toggle
        :desc "Capture" "c" #'org-capture
-       :desc "Discover ADRs" "d" #'workbench-org-discover-adrs
+       :desc "Discover ADRs" "d" #'workbench-org/discover-adrs
        :desc "Open jira.org" "j" #'workbench-org/open-jira-file)
 
       (:prefix-map ("t" . "terminals")

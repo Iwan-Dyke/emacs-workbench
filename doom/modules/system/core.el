@@ -12,6 +12,9 @@
 ;; Left Option remains Meta for Emacs bindings.
 (setq ns-right-alternate-modifier 'none)
 
+(defvar workbench/valid-profiles '("personal" "work")
+  "List of valid workbench profile names.")
+
 (defvar workbench/profile
   (let ((profile (or ;; Prefer daemon name — env var is unreliable across macOS daemon restarts
                      (let ((name (daemonp)))
@@ -20,7 +23,7 @@
                          (substring name (length "workbench-"))))
                      (getenv "WORKBENCH_PROFILE")
                      "personal")))
-    (if (member profile '("personal" "work"))
+    (if (member profile workbench/valid-profiles)
         profile
       (warn "Workbench: unknown profile '%s', defaulting to personal" profile)
       "personal"))

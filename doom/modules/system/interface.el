@@ -22,6 +22,7 @@
                          nil t))))
     (mapc #'disable-theme custom-enabled-themes)
     (load-theme theme t)
+    (setq workbench/default-theme theme)
     (message "Switched to %s" theme)))
 
 (defun workbench--apply-default-theme ()
@@ -128,6 +129,8 @@ From the Treemacs tree, return to the editing window."
     (define-key map "j" #'workbench/resize-down)
     (define-key map "k" #'workbench/resize-up)
     (define-key map "=" (lambda () (interactive) (balance-windows) (workbench--resize-message)))
+    (define-key map (kbd "C-g") #'workbench--resize-exit)
+    (define-key map [escape] #'workbench--resize-exit)
     (define-key map [t] #'workbench--resize-exit)
     map)
   "Transient keymap for repeatable window resizing.
