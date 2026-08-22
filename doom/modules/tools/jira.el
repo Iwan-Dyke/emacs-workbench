@@ -160,7 +160,7 @@
   "Fetch team tickets in STATUS via JQL. Returns list of plists, or (:error REASON)."
   (if (not (and workbench-jira-project workbench-jira-team-id))
       (list :error "Jira project/team not configured")
-    (let* ((jql (format "project = %s AND team = \"%s\" AND status = \"%s\""
+    (let* ((jql (format "project = \"%s\" AND team = \"%s\" AND status = \"%s\""
                         workbench-jira-project workbench-jira-team-id status))
            (result (workbench-jira--shell-or-error
                     nil "jira" "issue" "list"
@@ -333,36 +333,44 @@ the result. Parses output in the sentinel callback."
                     (when (timerp workbench-jira--async-timeout)
                       (cancel-timer workbench-jira--async-timeout)
                       (setq workbench-jira--async-timeout nil))
-                    (let ((result nil))
-                      (if (zerop (process-exit-status process))
-                          (when (buffer-live-p (process-buffer process))
-                            (with-current-buffer (process-buffer process)
-                              (goto-char (point-min))
-                              (condition-case nil
-                                  (setq result (read (current-buffer)))
-                                (error
-                                 (message "Jira refresh: failed to parse fetch result")))))
-                        (message "Jira refresh: process exited %d"
-                                 (process-exit-status process)))
+                    (unwind-protect
+                        (condition-case err
+                            (let ((result nil))
+                              (if (zerop (process-exit-status process))
+                                  (when (buffer-live-p (process-buffer process))
+                                    (with-current-buffer (process-buffer process)
+                                      (goto-char (point-min))
+                                      (condition-case nil
+                                          (setq result (read (current-buffer)))
+                                        (error
+                                         (message "Jira refresh: failed to parse fetch result")))))
+                                (message "Jira refresh: process exited %d"
+                                         (process-exit-status process)))
+                              (when (eq workbench-jira--async-process process)
+                                (setq workbench-jira--async-process nil))
+                              (when result
+                                ;; Merge: only overwrite cache fields that succeeded.
+                                ;; Preserve existing good data for fields that errored.
+                                (let ((merged (list :tickets (if (workbench-jira-error-p (plist-get result :tickets))
+                                                                (plist-get workbench-jira--cache :tickets)
+                                                              (plist-get result :tickets))
+                                                    :done (if (workbench-jira-error-p (plist-get result :done))
+                                                              (plist-get workbench-jira--cache :done)
+                                                            (plist-get result :done))
+                                                    :next (if (workbench-jira-error-p (plist-get result :next))
+                                                              (plist-get workbench-jira--cache :next)
+                                                            (plist-get result :next)))))
+                                  (setq workbench-jira--cache merged))
+                                (setq workbench-jira--cache-time (current-time))
+                                (run-hooks 'workbench-jira-after-refresh-hook)))
+                          (error
+                           (message "Jira refresh: sentinel error: %s"
+                                    (error-message-string err))
+                           (when (eq workbench-jira--async-process process)
+                             (setq workbench-jira--async-process nil))))
+                      ;; Always kill the output buffer to prevent leaks.
                       (when (buffer-live-p (process-buffer process))
-                        (kill-buffer (process-buffer process)))
-                      (when (eq workbench-jira--async-process process)
-                        (setq workbench-jira--async-process nil))
-                      (when result
-                        ;; Merge: only overwrite cache fields that succeeded.
-                        ;; Preserve existing good data for fields that errored.
-                        (let ((merged (list :tickets (if (workbench-jira-error-p (plist-get result :tickets))
-                                                        (plist-get workbench-jira--cache :tickets)
-                                                      (plist-get result :tickets))
-                                            :done (if (workbench-jira-error-p (plist-get result :done))
-                                                      (plist-get workbench-jira--cache :done)
-                                                    (plist-get result :done))
-                                            :next (if (workbench-jira-error-p (plist-get result :next))
-                                                      (plist-get workbench-jira--cache :next)
-                                                    (plist-get result :next)))))
-                          (setq workbench-jira--cache merged))
-                        (setq workbench-jira--cache-time (current-time))
-                        (run-hooks 'workbench-jira-after-refresh-hook))))))))
+                        (kill-buffer (process-buffer process)))))))))
     (setq workbench-jira--async-process proc)
     ;; Timeout: kill after 60s if still running
     (setq workbench-jira--async-timeout
