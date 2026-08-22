@@ -12,7 +12,7 @@ doctor:
 
 check:
     bash -n ./install.sh ./bin/install ./bin/install.d/platform-tools ./bin/install.d/language-tools ./bin/sync ./bin/doctor ./bin/workbench
-    command -v shellcheck >/dev/null && shellcheck ./install.sh ./bin/install ./bin/install.d/platform-tools ./bin/install.d/language-tools ./bin/sync ./bin/doctor ./bin/workbench || true
+    if command -v shellcheck >/dev/null 2>&1; then shellcheck ./install.sh ./bin/install ./bin/install.d/platform-tools ./bin/install.d/language-tools ./bin/sync ./bin/doctor ./bin/workbench; fi
     ./bin/doctor
 
 test:

@@ -167,6 +167,12 @@ install_doom() {
         return
     fi
 
+    # Verify symlink is in place before running doom install
+    if [ ! -L "$doom_target" ]; then
+        fail "doom config symlink not in place; cannot install Doom safely"
+        return
+    fi
+
     # Skip if Doom is already installed (the state directory is created by
     # `doom install` and proves a successful prior run). Re-running install -!
     # is destructive: it wipes and recreates the local state.

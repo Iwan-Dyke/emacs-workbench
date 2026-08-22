@@ -161,7 +161,12 @@ install_icon_fonts() {
         actual_sha=$(sha256sum "$font_path" | awk '{print $1}')
     fi
 
-    if [ -n "$actual_sha" ] && [ "$actual_sha" != "$nerd_font_sha256" ]; then
+    if [ -z "$actual_sha" ]; then
+        warn "no sha256 tool found; cannot verify font integrity"
+        return
+    fi
+
+    if [ "$actual_sha" != "$nerd_font_sha256" ]; then
         rm -f "$font_path"
         warn "nerd-icons font checksum mismatch (possible tampering); removed"
         return
