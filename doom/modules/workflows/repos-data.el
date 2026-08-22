@@ -18,10 +18,6 @@ Falls back to `workbench-jira-code-root' if nil.")
     ".cargo" ".rustup" "target" ".local" ".emacs.d")
   "Directory names to skip during scanning.")
 
-;;; ── Shell helper ───────────────────────────────────────────────────────────
-
-(defalias 'workbench-repos--shell #'workbench-shell)
-
 ;;; ── Scanner ────────────────────────────────────────────────────────────────
 
 (defun workbench-repos--scan-roots (roots)
@@ -63,11 +59,11 @@ Returns FOUND with any new repos prepended. SEEN prevents cycles."
 (defun workbench-repos--repo-status (path)
   "Get git status plist for repo at PATH."
   (let* ((name (file-name-nondirectory (directory-file-name path)))
-         (branch (or (workbench-repos--shell path "git" "branch" "--show-current") ""))
-         (porcelain (workbench-repos--shell path "git" "status" "--porcelain"))
-         (ab (workbench-repos--shell path "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
-         (last-commit (workbench-repos--shell path "git" "log" "-1" "--format=%ar"))
-         (stash-output (workbench-repos--shell path "git" "stash" "list"))
+         (branch (or (workbench-shell path "git" "branch" "--show-current") ""))
+         (porcelain (workbench-shell path "git" "status" "--porcelain"))
+         (ab (workbench-shell path "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
+         (last-commit (workbench-shell path "git" "log" "-1" "--format=%ar"))
+         (stash-output (workbench-shell path "git" "stash" "list"))
          (dirty-lines (when porcelain (split-string porcelain "\n" t)))
          (dirty-count (length (or dirty-lines '())))
          (state (if (> dirty-count 0) 'dirty 'clean))
@@ -161,7 +157,7 @@ SORT-TYPE is one of: name, status, dirty."
 
 (defun workbench-repos--fetch (path)
   "Run git fetch on repo at PATH. Returns t on success, nil on failure."
-  (not (null (workbench-repos--shell path "git" "fetch" "--quiet"))))
+  (not (null (workbench-shell path "git" "fetch" "--quiet"))))
 
 (defun workbench-repos--pull (path)
   "Run git pull --ff-only on repo at PATH. Returns (t) or (nil . error-msg)."

@@ -74,7 +74,7 @@ When TICKETS is an error plist, refuses to write to avoid wiping valid content."
         (with-temp-file file
           (insert content))))))
 
-(defun workbench-org-sync-jira ()
+(defun workbench-org/sync-jira ()
   "Sync In Progress tickets from the shared Jira cache to jira.org.
 When called interactively, ensures the cache is populated first.
 When called from the refresh hook, the cache is already fresh."
@@ -85,7 +85,7 @@ When called from the refresh hook, the cache is already fresh."
     (workbench-org--write-jira-file tickets)))
 
 ;; Hook into the shared Jira refresh so jira.org stays current
-(add-hook 'workbench-jira-after-refresh-hook #'workbench-org-sync-jira)
+(add-hook 'workbench-jira-after-refresh-hook #'workbench-org/sync-jira)
 
 ;;; ── Agenda Views ───────────────────────────────────────────────────────────
 
@@ -187,7 +187,7 @@ Skips symlinks to prevent traversal into unexpected locations."
   "Return the org file path for ADR nodes from REPO-NAME."
   (expand-file-name (format "projects/%s-adrs.org" repo-name) org-directory))
 
-(defun workbench-org-discover-adrs ()
+(defun workbench-org/discover-adrs ()
   "Scan repos for ADRs and create/update org-roam nodes.
 Creates one org file per repo in ~/org/projects/ containing ADR nodes.
 Only rewrites files whose content has changed, and only triggers

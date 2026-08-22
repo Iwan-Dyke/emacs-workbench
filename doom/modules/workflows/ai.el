@@ -180,23 +180,14 @@ Replaces the previous 5-path timing approach with a single mechanism."
   (when (and (buffer-live-p buffer) (window-live-p window))
     (with-current-buffer buffer
       (workbench--vterm-resize buffer window)
-      ;; Check if dimensions match — if so, we're done
-      (let ((matches (and (boundp 'vterm--term) vterm--term
-                          (let ((h (window-body-height window))
-                                (w (window-body-width window)))
-                            ;; vterm doesn't expose current pty size directly,
-                            ;; so we always retry through the schedule.
-                            nil))))
-        (if (or matches (null remaining-delays))
-            ;; Done — clear timer reference
-            (setq workbench--ai-pane-resize-timer nil)
-          ;; Schedule next retry
-          (setq workbench--ai-pane-resize-timer
-                (run-at-time
-                 (car remaining-delays) nil
-                 (lambda ()
-                   (workbench--ai-pane-resize-retry
-                    buffer window (cdr remaining-delays))))))))))
+      (if (null remaining-delays)
+          (setq workbench--ai-pane-resize-timer nil)
+        (setq workbench--ai-pane-resize-timer
+              (run-at-time
+               (car remaining-delays) nil
+               (lambda ()
+                 (workbench--ai-pane-resize-retry
+                  buffer window (cdr remaining-delays)))))))))
 
 (defun workbench--toggle-project-ai (tool)
   "Toggle TOOL as the project AI pane for the current workspace."

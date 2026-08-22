@@ -7,12 +7,9 @@
 
 ;;; ── Shell Helpers ──────────────────────────────────────────────────────────
 
-(defalias 'workbench--dashboard-shell #'workbench-shell)
-(defalias 'workbench--dashboard-shell-lines #'workbench-shell-lines)
-
 (defun workbench--dashboard-git-p (directory)
   "Return non-nil if DIRECTORY is inside a git repository."
-  (workbench--dashboard-shell directory "git" "rev-parse" "--git-dir"))
+  (workbench-shell directory "git" "rev-parse" "--git-dir"))
 
 ;;; ── Overview ───────────────────────────────────────────────────────────────
 
@@ -60,17 +57,17 @@
 (defun workbench--dashboard-size (directory)
   "Get file count and line count for DIRECTORY via git ls-files."
   (when (workbench--dashboard-git-p directory)
-    (when-let ((files (workbench--dashboard-shell-lines directory "git" "ls-files")))
+    (when-let ((files (workbench-shell-lines directory "git" "ls-files")))
       (list :files (length files)
             :lines (string-to-number
-                    (or (workbench--dashboard-shell directory
+                    (or (workbench-shell directory
                           "sh" "-c" "git ls-files -z | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}'")
                         "0"))))))
 
 (defun workbench--dashboard-contributors (directory)
   "Get top 3 contributors by commit count in DIRECTORY."
   (when (workbench--dashboard-git-p directory)
-    (workbench--dashboard-shell-lines directory
+    (workbench-shell-lines directory
       "git" "shortlog" "-sn" "--no-merges" "HEAD")))
 
 (defun workbench--dashboard-overview (directory)
@@ -99,11 +96,11 @@
 (defun workbench--dashboard-git (directory)
   "Collect git state for DIRECTORY. Returns plist or nil if not a git repo."
   (when (workbench--dashboard-git-p directory)
-    (let ((branch (workbench--dashboard-shell directory "git" "branch" "--show-current"))
-          (status-lines (workbench--dashboard-shell-lines directory "git" "status" "--porcelain"))
-          (ahead-behind (workbench--dashboard-shell directory
+    (let ((branch (workbench-shell directory "git" "branch" "--show-current"))
+          (status-lines (workbench-shell-lines directory "git" "status" "--porcelain"))
+          (ahead-behind (workbench-shell directory
                           "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
-          (last-commit (workbench--dashboard-shell directory
+          (last-commit (workbench-shell directory
                          "git" "log" "-1" "--format=%h %s (%ar)")))
       (let ((modified 0) (untracked 0))
         (dolist (line (or status-lines '()))
@@ -126,7 +123,7 @@
 (defun workbench--dashboard-languages (directory)
   "Collect language breakdown from git ls-files in DIRECTORY.
 Returns alist of (language . count) sorted by count descending, top 5."
-  (when-let ((files (workbench--dashboard-shell-lines directory "git" "ls-files")))
+  (when-let ((files (workbench-shell-lines directory "git" "ls-files")))
     (let ((counts (make-hash-table :test 'equal)))
       (dolist (file files)
         (when-let ((ext (file-name-extension file)))
@@ -141,7 +138,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
 (defun workbench--dashboard-commands-justfile (directory)
   "Parse justfile recipe names from DIRECTORY."
   (when (file-exists-p (expand-file-name "justfile" directory))
-    (workbench--dashboard-shell-lines directory "just" "--summary")))
+    (workbench-shell-lines directory "just" "--summary")))
 
 (defun workbench--dashboard-detect-task-runner (directory)
   "Detect the task runner in DIRECTORY. Returns (name . recipes) or nil."
@@ -149,7 +146,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
    ((file-exists-p (expand-file-name "justfile" directory))
     (cons "justfile" (workbench--dashboard-commands-justfile directory)))
    ((file-exists-p (expand-file-name "Makefile" directory))
-    (cons "Makefile" (workbench--dashboard-shell-lines directory
+    (cons "Makefile" (workbench-shell-lines directory
                        "sh" "-c" "make -pRrq --no-print-directory 2>/dev/null | awk -F: '/^[a-zA-Z0-9][^$#\\/\\t=]*:([^=]|$)/ {split($1,a,\" \"); print a[1]}'")))))
 
 ;;; ── Dependencies ───────────────────────────────────────────────────────────
@@ -229,7 +226,7 @@ Returns alist of (language . count) sorted by count descending, top 5."
 (defun workbench--dashboard-recent (directory)
   "Collect recent activity for DIRECTORY."
   (when (workbench--dashboard-git-p directory)
-    (list :commits (workbench--dashboard-shell-lines directory
+    (list :commits (workbench-shell-lines directory
                      "git" "log" "--oneline" "-5")
-          :changed (workbench--dashboard-shell-lines directory
+          :changed (workbench-shell-lines directory
                      "git" "diff" "--name-only" "HEAD"))))
