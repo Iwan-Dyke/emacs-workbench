@@ -61,23 +61,26 @@ collides)."
 
 (defun workbench--find-workspace-for-directory (base directory)
   "Find an existing workspace for DIRECTORY, checking BASE and BASE<N> variants.
-Returns the workspace name if found, nil otherwise."
-  (let ((target (file-name-as-directory (file-truename directory))))
-    (cond
-     ;; Check base name
-     ((and (+workspace-exists-p base)
-           (workbench--workspace-matches-directory-p base directory))
-      base)
-     ;; Check suffixed names (iterate up to 10 regardless of gaps)
-     (t
-      (let ((n 2) candidate found)
-        (while (and (not found) (<= n 10))
-          (setq candidate (format "%s<%d>" base n))
-          (when (and (+workspace-exists-p candidate)
-                     (workbench--workspace-matches-directory-p candidate directory))
-            (setq found candidate))
-          (setq n (1+ n)))
-        found)))))
+Returns the workspace name if found, nil otherwise.
+Searches unbounded — uses the workspace directory registry to find all
+suffixed variants rather than assuming contiguous numbering."
+  (cond
+   ;; Check base name
+   ((and (+workspace-exists-p base)
+         (workbench--workspace-matches-directory-p base directory))
+    base)
+   ;; Check suffixed names via the directory registry (handles gaps)
+   (t
+    (let ((target (file-name-as-directory (file-truename directory)))
+          (found nil))
+      (maphash (lambda (ws dir)
+                 (when (and (not found)
+                            (string-prefix-p (concat base "<") ws)
+                            (equal dir target)
+                            (+workspace-exists-p ws))
+                   (setq found ws)))
+               workbench--workspace-directories)
+      found))))
 
 (defun workbench--workspace-matches-directory-p (workspace-name directory)
   "Return non-nil if WORKSPACE-NAME belongs to DIRECTORY.
@@ -177,10 +180,12 @@ This is the one-shot equivalent of: SPC p o → SPC e → SPC t c/k."
       ;; Step 5: open Treemacs on the left
       (workbench--treemacs-display directory)
       ;; Step 6: select the main editing window (right of Treemacs)
+      ;; If treemacs--init didn't create a second window (edge case: frame too
+      ;; narrow, or treemacs internal state issue on subsequent workspace opens),
+      ;; ensure one exists so the dashboard and AI pane have somewhere to land.
       (workbench--select-main-window)
-      ;; Safety: if we're still in a dedicated window (treemacs init failed to
-      ;; create a second window), create one so switch-to-buffer can work.
-      (when (window-dedicated-p)
+      (when (or (window-dedicated-p)
+                (eq (selected-window) (workbench--treemacs-window)))
         (select-window (split-window-right)))
       ;; Step 7: show the project dashboard in the centre
       (workbench/open-project-dashboard directory)

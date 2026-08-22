@@ -617,4 +617,62 @@ the workspace already exists at that point, it returned 'name<2>' instead of
     (let ((expected-buf (format "*workbench:%s*" (+workspace-current-name))))
       (should (equal expected-buf "*workbench:myproject*")))))
 
+;;; ── Treemacs-persp empty workspace ─────────────────────────────────────────
+
+(ert-deftest coding/treemacs-persp-creates-empty-workspace ()
+  "treemacs-persp--create-workspace creates an empty workspace with no projects.
+Previously it auto-detected the current project which was wrong during
+workspace creation (context belongs to the previous workspace)."
+  ;; The override is defined in files.el via with-eval-after-load 'treemacs-persp.
+  ;; In tests, treemacs-persp isn't loaded, so we verify the source code directly.
+  (let* ((files-el (expand-file-name "doom/modules/tools/files.el" workbench-test-root))
+         (content (with-temp-buffer
+                    (insert-file-contents files-el)
+                    (buffer-string))))
+    ;; The override should NOT call treemacs--find-current-user-project
+    (should-not (string-match-p
+                 "treemacs-persp--create-workspace[^)]*treemacs--find-current-user-project"
+                 content))
+    ;; It should still call treemacs-do-create-workspace (the actual creation)
+    (should (string-match-p "treemacs-do-create-workspace" content))))
+
+;;; ── Full layout window safety ──────────────────────────────────────────────
+
+(ert-deftest coding/full-layout/splits-when-treemacs-is-only-window ()
+  "Full layout creates a split if treemacs-display leaves only the tree window.
+Verifies the safety check: when selected window IS the treemacs window after
+select-main-window runs, a split-window-right is called."
+  (let ((split-called nil)
+        (dashboard-opened nil)
+        (workbench--workspace-directories (make-hash-table :test 'equal))
+        (workbench-test--workspaces '()))
+    (cl-letf (((symbol-function 'derived-mode-p) (lambda (_mode) nil))
+              ((symbol-function 'read-directory-name)
+               (lambda (_prompt) "/tmp/proj/"))
+              ((symbol-function '+workspace-switch)
+               (lambda (name &optional _create)
+                 (push name workbench-test--workspaces)))
+              ((symbol-function '+workspace-exists-p) (lambda (_name) nil))
+              ((symbol-function '+workspace-current-name)
+               (lambda () (or (car workbench-test--workspaces) "main")))
+              ((symbol-function 'workbench--full-layout-active-p)
+               (lambda (_dir) nil))
+              ((symbol-function 'delete-other-windows) (lambda () nil))
+              ((symbol-function 'workbench--treemacs-display) (lambda (_dir) nil))
+              ;; After treemacs-display + select-main-window, we're in treemacs
+              ((symbol-function 'workbench--treemacs-window)
+               (lambda () (selected-window)))
+              ((symbol-function 'workbench--select-main-window) (lambda () nil))
+              ((symbol-function 'window-dedicated-p) (lambda (&optional _w) nil))
+              ((symbol-function 'split-window-right)
+               (lambda () (setq split-called t) (selected-window)))
+              ((symbol-function 'select-window) (lambda (_w) nil))
+              ((symbol-function 'workbench/open-project-dashboard)
+               (lambda (_dir) (setq dashboard-opened t)))
+              ((symbol-function 'workbench--show-project-ai)
+               (lambda (_tool) nil)))
+      (workbench/open-project-workspace-full-layout)
+      (should split-called)
+      (should dashboard-opened))))
+
 ;;; test/unit/test-coding.el ends here

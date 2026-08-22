@@ -178,21 +178,17 @@ current project (or `default-directory') and focuses it."
   (with-eval-after-load 'treemacs-persp
     (defun treemacs-persp--create-workspace (name)
       "Create a new empty workspace for the given persp NAME.
-Workbench override: never copies fallback projects."
+Workbench override: always creates an empty workspace. Never auto-detects
+a project from the current context because during workspace creation the
+context still belongs to the PREVIOUS workspace — auto-detecting would
+inject the wrong project root. `workbench--treemacs-display' sets the
+correct root explicitly after the workspace switch completes."
       (let* ((ws-result (treemacs-do-create-workspace name))
              (ws-status (car ws-result))
              (ws (cadr ws-result)))
         (unless (eq ws-status 'success)
           (treemacs-log "Failed to create workspace for perspective: %s" ws)
           (setq ws (car treemacs--workspaces)))
-        ;; Only set a project if treemacs can detect one from projectile/project.el
-        (let ((root-path (treemacs--find-current-user-project)))
-          (when root-path
-            (setf (treemacs-workspace->projects ws)
-                  (list (treemacs-project->create!
-                         :name (treemacs--filename root-path)
-                         :path root-path
-                         :path-status (treemacs--get-path-status root-path))))))
         ws)))
 
   ;; Unlock the tree's width so it can be resized like any other window
