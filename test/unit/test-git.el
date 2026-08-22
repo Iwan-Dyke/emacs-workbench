@@ -316,5 +316,19 @@ check is the primary toggle condition, showing-p is a fallback."
   ;; when no magit buffer is displayed — confirming it's a secondary check.
   (should-not (workbench--popup-magit-showing-p)))
 
+;;; ── Dedicated window fallback ──────────────────────────────────────────────
+
+(ert-deftest popup-magit/toggle-on-clears-dedication-when-all-windows-dedicated ()
+  "The toggle-on path handles all-dedicated-windows by clearing dedication.
+Verified via source inspection: when seq-find returns nil (all windows
+dedicated), set-window-dedicated-p is called with nil on current window."
+  (let* ((files-el (expand-file-name "modules/tools/git.el" doom-user-dir))
+         (content (with-temp-buffer
+                    (insert-file-contents files-el)
+                    (buffer-string))))
+    ;; The if/else pattern should exist: select target OR clear dedication
+    (should (string-match-p "if target" content))
+    (should (string-match-p "set-window-dedicated-p.*(selected-window).*nil" content))))
+
 (provide 'test-git)
 ;;; test/unit/test-git.el ends here

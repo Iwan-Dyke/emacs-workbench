@@ -56,14 +56,19 @@ was focused when the popup was opened."
                 (select-window (workbench--popup-terminal-primary-window)))
             ;; Config is stale — just bury the magit buffer
             (when-let ((buf (workbench--popup-magit-buffer)))
-              (bury-buffer buf))))
+              (bury-buffer buf))
+            (select-window (workbench--popup-terminal-primary-window))))
       ;; Takeover: save layout, show magit full-frame.
       ;; If the selected window is dedicated (e.g. Treemacs), select a
       ;; non-dedicated window first so that switch-to-buffer works.
       (when (window-dedicated-p)
         (let ((target (seq-find (lambda (w) (not (window-dedicated-p w)))
                                 (window-list))))
-          (when target (select-window target))))
+          (if target
+              (select-window target)
+            ;; All windows dedicated (e.g. Treemacs-only frame edge case) —
+            ;; clear dedication so we can proceed with switch-to-buffer.
+            (set-window-dedicated-p (selected-window) nil))))
       (unless (gethash ws workbench--popup-magit-configs)
         (puthash ws (current-window-configuration) workbench--popup-magit-configs))
       (let ((ignore-window-parameters t))
