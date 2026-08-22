@@ -88,7 +88,7 @@
     ;; Simulate git log output: epoch|relative-time|message-with-pipe
     (cl-letf (((symbol-function 'workbench-cc--recent-repos)
                (lambda () '("/tmp/myrepo")))
-              ((symbol-function 'workbench-cc--shell-lines)
+              ((symbol-function 'workbench-shell-lines)
                (lambda (_dir &rest _args)
                  '("1720000000|2 hours ago|fix: use A | B pattern"))))
       (let* ((commits (workbench-cc--recent-commits))

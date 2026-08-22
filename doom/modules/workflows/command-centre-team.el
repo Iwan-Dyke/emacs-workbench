@@ -7,9 +7,9 @@
 (defvar workbench-cc--buffer-name)
 (defvar workbench-cc--data)
 
-(declare-function workbench-cc--days-since-update "command-centre-data")
-(declare-function workbench-cc--error-p "command-centre-data")
-(declare-function workbench-cc--error-reason "command-centre-data")
+(declare-function workbench-jira-days-since-update "modules/tools/jira")
+(declare-function workbench-jira-error-p "modules/tools/jira")
+(declare-function workbench-jira-error-reason "modules/tools/jira")
 
 ;;; ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ from the cached ticket list instead."
     ;; No text property (IC/SVG view) — offer ticket selection from cached data
     (if (and workbench-cc--data
              (plist-get workbench-cc--data :tickets)
-             (not (workbench-cc--error-p (plist-get workbench-cc--data :tickets))))
+             (not (workbench-jira-error-p (plist-get workbench-cc--data :tickets))))
         (let* ((tickets (plist-get workbench-cc--data :tickets))
                (choices (mapcar (lambda (tkt)
                                   (format "%s  %s"
@@ -74,9 +74,9 @@ from the cached ticket list instead."
          (done-tickets (plist-get data :done))
          (attention (plist-get data :attention))
          (infra (plist-get data :infra))
-         (wip-error (workbench-cc--error-p wip-tickets))
-         (next-error (workbench-cc--error-p next-tickets))
-         (done-error (workbench-cc--error-p done-tickets))
+         (wip-error (workbench-jira-error-p wip-tickets))
+         (next-error (workbench-jira-error-p next-tickets))
+         (done-error (workbench-jira-error-p done-tickets))
          (wip-count (if wip-error 0 (length wip-tickets)))
          (wip-limit workbench-jira-team-wip-limit)
          (team-label (or workbench-jira-team-name "Team")))
@@ -131,7 +131,7 @@ from the cached ticket list instead."
                 "\n\n")
         (cond
          (wip-error
-          (workbench-cc--render-fetch-error (workbench-cc--error-reason wip-tickets)))
+          (workbench-cc--render-fetch-error (workbench-jira-error-reason wip-tickets)))
          ((null wip-tickets)
           (insert "    " (propertize "(empty)" 'face 'shadow) "\n"))
          (t
@@ -139,7 +139,7 @@ from the cached ticket list instead."
             (let* ((key (plist-get tkt :key))
                    (summary (plist-get tkt :summary))
                    (assignee (plist-get tkt :assignee))
-                   (days (workbench-cc--days-since-update (plist-get tkt :updated)))
+                   (days (workbench-jira-days-since-update (plist-get tkt :updated)))
                    (comment (plist-get tkt :comment-snippet))
                    (stale (and days (> days 3)))
                    (very-stale (and days (> days 7)))
@@ -192,7 +192,7 @@ from the cached ticket list instead."
                 "\n\n")
         (cond
          (next-error
-          (workbench-cc--render-fetch-error (workbench-cc--error-reason next-tickets)))
+          (workbench-cc--render-fetch-error (workbench-jira-error-reason next-tickets)))
          ((null next-tickets)
           (insert "    " (propertize "(empty)" 'face 'shadow) "\n"))
          (t
@@ -228,7 +228,7 @@ from the cached ticket list instead."
                 "\n\n")
         (cond
          (done-error
-          (workbench-cc--render-fetch-error (workbench-cc--error-reason done-tickets)))
+          (workbench-cc--render-fetch-error (workbench-jira-error-reason done-tickets)))
          ((null done-tickets)
           (insert "    " (propertize "(empty)" 'face 'shadow) "\n"))
          (t

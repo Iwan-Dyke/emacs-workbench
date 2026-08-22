@@ -7,8 +7,8 @@
 (defvar workbench-cc--buffer-name)
 (defvar workbench-jira-wip-limit)
 
-(declare-function workbench-cc--error-p "command-centre-data")
-(declare-function workbench-cc--error-reason "command-centre-data")
+(declare-function workbench-jira-error-p "modules/tools/jira")
+(declare-function workbench-jira-error-reason "modules/tools/jira")
 
 ;;; ── Theme Helpers ──────────────────────────────────────────────────────────
 
@@ -120,7 +120,7 @@
 
     ;; ── WIP Gauge + Jira ──
     (let* ((tickets-raw (plist-get data :tickets))
-           (tickets-error (workbench-cc--error-p tickets-raw))
+           (tickets-error (workbench-jira-error-p tickets-raw))
            (tickets (if tickets-error '() tickets-raw))
            (wip-count (length tickets))
            (wip-limit workbench-jira-wip-limit)
@@ -159,7 +159,7 @@
         (setq ty (+ ty (funcall s 22)))
         (if (null tickets)
             (svg-text svg (if tickets-error
-                              (format "⚠ %s" (workbench-cc--error-reason tickets-raw))
+                              (format "⚠ %s" (workbench-jira-error-reason tickets-raw))
                             "No active tickets")
                       :x tx :y ty :font-size font-sm
                       :fill (if tickets-error red dim) :font-family "monospace")
@@ -230,12 +230,12 @@
             (dy (+ y (funcall s 22))))
         ;; Next tickets
         (let* ((next-raw (plist-get data :next))
-               (next-err (workbench-cc--error-p next-raw))
+               (next-err (workbench-jira-error-p next-raw))
                (next-items (if next-err '() next-raw)))
           (if (null next-items)
               (progn
                 (svg-text svg (if next-err
-                                  (format "⚠ %s" (workbench-cc--error-reason next-raw))
+                                  (format "⚠ %s" (workbench-jira-error-reason next-raw))
                                 "Queue empty")
                           :x pad :y ny :font-size font-sm
                           :fill (if next-err red dim) :font-family "monospace")
@@ -249,12 +249,12 @@
               (setq ny (+ ny line-h)))))
         ;; Done tickets
         (let* ((done-raw (plist-get data :done))
-               (done-err (workbench-cc--error-p done-raw))
+               (done-err (workbench-jira-error-p done-raw))
                (done-items (if done-err '() done-raw)))
           (if (null done-items)
               (progn
                 (svg-text svg (if done-err
-                                  (format "⚠ %s" (workbench-cc--error-reason done-raw))
+                                  (format "⚠ %s" (workbench-jira-error-reason done-raw))
                                 "Nothing recent")
                           :x col2-x :y dy :font-size font-sm
                           :fill (if done-err red dim) :font-family "monospace")

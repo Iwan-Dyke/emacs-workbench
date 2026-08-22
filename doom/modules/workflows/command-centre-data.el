@@ -5,16 +5,7 @@
 
 (require 'seq)
 
-;;; ── Shell Helpers (for non-Jira data: git, infra) ──────────────────────────
-
-(defalias 'workbench-cc--shell #'workbench-shell)
-(defalias 'workbench-cc--shell-lines #'workbench-shell-lines)
-
 ;;; ── Jira (delegated to shared module) ──────────────────────────────────────
-
-(defalias 'workbench-cc--error-p #'workbench-jira-error-p)
-(defalias 'workbench-cc--error-reason #'workbench-jira-error-reason)
-(defalias 'workbench-cc--days-since-update #'workbench-jira-days-since-update)
 
 (defun workbench-cc--jira-tickets ()
   "Fetch In Progress tickets via shared Jira module."
@@ -42,7 +33,7 @@
                                dirs))
          (with-commit (seq-filter #'identity
                         (mapcar (lambda (d)
-                                  (when-let ((date (workbench-cc--shell
+                                  (when-let ((date (workbench-shell
                                                     d "git" "log" "-1"
                                                     (concat "--author=" workbench-jira-git-author) "--format=%ct")))
                                     (cons d (string-to-number date))))
@@ -52,11 +43,11 @@
 
 (defun workbench-cc--repo-status (dir)
   "Get git status plist for DIR."
-  (let ((branch (workbench-cc--shell dir "git" "branch" "--show-current"))
-        (dirty (workbench-cc--shell-lines dir "git" "status" "--porcelain"))
-        (ab (workbench-cc--shell dir "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
-        (last-commit (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%ar"))
-        (last-msg (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%s")))
+  (let ((branch (workbench-shell dir "git" "branch" "--show-current"))
+        (dirty (workbench-shell-lines dir "git" "status" "--porcelain"))
+        (ab (workbench-shell dir "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
+        (last-commit (workbench-shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%ar"))
+        (last-msg (workbench-shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%s")))
     (let (ahead behind)
       (when (and ab (string-match "\\([0-9]+\\)\t\\([0-9]+\\)" ab))
         (setq ahead (string-to-number (match-string 1 ab))
@@ -74,7 +65,7 @@
   (let* ((dirs (workbench-cc--recent-repos))
          (all nil))
     (dolist (dir dirs)
-      (when-let ((lines (workbench-cc--shell-lines
+      (when-let ((lines (workbench-shell-lines
                          dir "git" "log" "-5"
                          (concat "--author=" workbench-jira-git-author) "--since=3 days ago"
                          "--format=%ct|%ar|%s")))
@@ -94,8 +85,8 @@
 
 (defun workbench-cc--infra-status ()
   "Check infrastructure health."
-  (list :colima (not (null (workbench-cc--shell nil "colima" "status")))
-        :containers (or (workbench-cc--shell-lines
+  (list :colima (not (null (workbench-shell nil "colima" "status")))
+        :containers (or (workbench-shell-lines
                          nil "docker" "ps" "--format" "{{.Names}}")
                         '())
         :spark (condition-case nil
@@ -121,12 +112,12 @@
   "Collect all dashboard data. Returns plist.
 Jira fields may contain (:error REASON) instead of a list when fetch fails."
   (let* ((tickets-raw (workbench-cc--jira-tickets))
-         (tickets (if (workbench-cc--error-p tickets-raw)
+         (tickets (if (workbench-jira-error-p tickets-raw)
                       tickets-raw
                     (mapcar (lambda (tkt)
                               (let* ((key (plist-get tkt :key))
                                      (details (workbench-cc--ticket-details key))
-                                     (days (workbench-cc--days-since-update (plist-get tkt :updated))))
+                                     (days (workbench-jira-days-since-update (plist-get tkt :updated))))
                                 (append tkt
                                         (list :logged-today
                                               (workbench-cc--ticket-commented-today-p key)
@@ -157,7 +148,7 @@ Jira fields may contain (:error REASON) instead of a list when fetch fails."
 Returns items sorted by urgency: stale first, then no-recent-comment."
   (let ((items nil))
     (dolist (tkt tickets)
-      (let* ((days (workbench-cc--days-since-update (plist-get tkt :updated)))
+      (let* ((days (workbench-jira-days-since-update (plist-get tkt :updated)))
              (key (plist-get tkt :key))
              (assignee (plist-get tkt :assignee)))
         (cond
@@ -183,7 +174,7 @@ Ticket fields may contain (:error REASON) instead of a list when fetch fails.
 Also fetches personal In Progress tickets (via :tickets) so the shared Jira
 cache can be populated for org agenda sync."
   (let* ((wip-raw (workbench-cc--team-tickets-by-status workbench-jira-status-wip))
-         (wip (if (workbench-cc--error-p wip-raw)
+         (wip (if (workbench-jira-error-p wip-raw)
                   wip-raw
                 (mapcar (lambda (tkt)
                           (let* ((key (plist-get tkt :key))
@@ -194,8 +185,8 @@ cache can be populated for org agenda sync."
                         wip-raw)))
          (next (workbench-cc--team-tickets-by-status workbench-jira-status-next))
          (done-raw (workbench-cc--team-tickets-by-status workbench-jira-status-done))
-         (done (if (workbench-cc--error-p done-raw) done-raw (seq-take done-raw 5)))
-         (attention (if (workbench-cc--error-p wip)
+         (done (if (workbench-jira-error-p done-raw) done-raw (seq-take done-raw 5)))
+         (attention (if (workbench-jira-error-p wip)
                         nil
                       (workbench-cc--team-attention-items wip)))
          ;; Also fetch personal tickets for the shared Jira cache (org agenda)

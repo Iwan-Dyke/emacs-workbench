@@ -109,15 +109,15 @@
 
 (ert-deftest cc-data/error-p-on-error-plist ()
   "error-p returns t for (:error reason) plist."
-  (should (workbench-cc--error-p '(:error "fetch failed"))))
+  (should (workbench-jira-error-p '(:error "fetch failed"))))
 
 (ert-deftest cc-data/error-p-on-normal-list ()
   "error-p returns nil for normal ticket list."
-  (should-not (workbench-cc--error-p '((:key "X-1")))))
+  (should-not (workbench-jira-error-p '((:key "X-1")))))
 
 (ert-deftest cc-data/error-reason-extracts-message ()
   "error-reason returns the reason string."
-  (should (equal (workbench-cc--error-reason '(:error "timeout")) "timeout")))
+  (should (equal (workbench-jira-error-reason '(:error "timeout")) "timeout")))
 
 (provide 'test-command-centre)
 ;;; test-command-centre.el ends here
