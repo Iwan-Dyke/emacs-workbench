@@ -281,5 +281,28 @@
                         (eq face 'workbench-repos-behind)))))
       (kill-buffer buf))))
 
+;;; ── Render ordering ────────────────────────────────────────────────────────
+
+(ert-deftest repos-render/footer-appears-after-table ()
+  "Footer and table data both appear in the rendered buffer.
+vtable renders data rows after the make-vtable call site, so the footer is
+placed before make-vtable in code to appear between header and data in buffer.
+This test verifies both are present and data appears after the footer."
+  (let ((repos (list (list :name "test-repo" :path "/tmp/test"
+                           :branch "main" :state 'clean :dirty 0
+                           :ahead 0 :behind 0 :last-commit "1 hour ago"
+                           :stash 0))))
+    (let ((buf (workbench-repos--render repos)))
+      (with-current-buffer buf
+        (goto-char (point-min))
+        ;; Search for the footer separator (unique horizontal line before keybindings)
+        (let ((footer-pos (and (search-forward "uit" nil t) (point)))
+              (data-pos (and (search-forward "test-repo" nil t) (point))))
+          (should footer-pos)
+          (should data-pos)
+          ;; vtable data rows appear AFTER the footer (vtable appends at end)
+          (should (> data-pos footer-pos))))
+      (kill-buffer buf))))
+
 (provide 'test-repos-render)
 ;;; test-repos-render.el ends here

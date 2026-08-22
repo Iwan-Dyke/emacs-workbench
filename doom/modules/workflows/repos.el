@@ -252,18 +252,9 @@
 
 (defvar workbench-repos-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "r" #'workbench-repos-refresh)
-    (define-key map "f" #'workbench-repos-cycle-filter)
-    (define-key map "s" #'workbench-repos-cycle-sort)
-    (define-key map "u" #'workbench-repos-fetch-all)
-    (define-key map "p" #'workbench-repos-pull-selected)
-    (define-key map "P" #'workbench-repos-pull-all)
-    (define-key map "/" #'workbench-repos-search)
-    (define-key map (kbd "RET") #'workbench-repos-open-project)
-    (define-key map "g" #'workbench-repos-magit)
+    ;; Non-evil fallback bindings (minimal — evil-define-key is canonical)
     (define-key map "q" #'quit-window)
-    (define-key map "j" #'next-line)
-    (define-key map "k" #'previous-line)
+    (define-key map (kbd "RET") #'workbench-repos-open-project)
     map)
   "Keymap for repos dashboard.")
 
@@ -275,6 +266,7 @@
 
 (after! evil
   (evil-set-initial-state 'workbench-repos-mode 'normal)
+  ;; Single source of truth for all repos keybindings in evil normal state.
   (evil-define-key 'normal workbench-repos-mode-map
     "r" #'workbench-repos-refresh
     "f" #'workbench-repos-cycle-filter
@@ -297,12 +289,7 @@
             (when (bound-and-true-p evil-snipe-local-mode)
               (evil-snipe-local-mode -1))
             (when (bound-and-true-p evil-snipe-override-local-mode)
-              (evil-snipe-override-local-mode -1))
-            ;; Belt and braces: force our bindings into the state-local map
-            ;; in case snipe re-enables via a hook.
-            (when (fboundp 'evil-local-set-key)
-              (evil-local-set-key 'normal "s" #'workbench-repos-cycle-sort)
-              (evil-local-set-key 'normal "f" #'workbench-repos-cycle-filter))))
+              (evil-snipe-override-local-mode -1))))
 
 ;;; ── Commands ───────────────────────────────────────────────────────────────
 
