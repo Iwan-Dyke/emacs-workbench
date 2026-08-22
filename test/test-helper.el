@@ -190,6 +190,7 @@ Override in individual tests to simulate workspace state.")
 
 ;; Load shared shell module — foundational dependency for all modules.
 (workbench-test-load-module "modules/tools/shell")
+(workbench-test-load-module "modules/tools/popup")
 
 ;;; ── Test Utilities ─────────────────────────────────────────────────────────
 

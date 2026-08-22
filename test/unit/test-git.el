@@ -319,12 +319,11 @@ check is the primary toggle condition, showing-p is a fallback."
 ;;; ── Dedicated window fallback ──────────────────────────────────────────────
 
 (ert-deftest popup-magit/toggle-on-clears-dedication-when-all-windows-dedicated ()
-  "The toggle-on path handles all-dedicated-windows by clearing dedication.
-Verified via source inspection: when seq-find returns nil (all windows
-dedicated), set-window-dedicated-p is called with nil on current window."
-  (let* ((files-el (expand-file-name "modules/tools/git.el" doom-user-dir))
+  "The show-prepare path handles all-dedicated-windows by clearing dedication.
+Verified via source inspection of the shared popup module."
+  (let* ((popup-el (expand-file-name "modules/tools/popup.el" doom-user-dir))
          (content (with-temp-buffer
-                    (insert-file-contents files-el)
+                    (insert-file-contents popup-el)
                     (buffer-string))))
     ;; The if/else pattern should exist: select target OR clear dedication
     (should (string-match-p "if target" content))
