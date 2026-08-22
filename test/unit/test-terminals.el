@@ -575,5 +575,44 @@ rather than landing on whichever window was focused when popup was opened."
       ;; Should have called primary-window selection after restore
       (should primary-called))))
 
+;;; ── sensible-root fallback chain ───────────────────────────────────────────
+
+(ert-deftest popup-terminal/sensible-root-prefers-project-root ()
+  "sensible-root returns project root when it's not ~ or /."
+  (cl-letf (((symbol-function 'workbench--project-root)
+             (lambda () "/tmp/my-project/")))
+    (should (equal (workbench--popup-terminal-sensible-root) "/tmp/my-project/"))))
+
+(ert-deftest popup-terminal/sensible-root-falls-back-to-workspace-directory ()
+  "sensible-root uses workspace directory registry when project root is ~/."
+  (let ((workbench--workspace-directories (make-hash-table :test 'equal)))
+    (puthash "test-ws" "/tmp/ws-dir/" workbench--workspace-directories)
+    (cl-letf (((symbol-function 'workbench--project-root)
+               (lambda () (expand-file-name "~/")))
+              ((symbol-function '+workspace-current-name)
+               (lambda () "test-ws")))
+      (should (equal (workbench--popup-terminal-sensible-root) "/tmp/ws-dir/")))))
+
+(ert-deftest popup-terminal/sensible-root-falls-back-to-code-root ()
+  "sensible-root falls back to workbench-jira-code-root when all else fails."
+  (let ((workbench--workspace-directories (make-hash-table :test 'equal))
+        (workbench-jira-code-root "~/code/"))
+    (cl-letf (((symbol-function 'workbench--project-root)
+               (lambda () (expand-file-name "~/")))
+              ((symbol-function '+workspace-current-name)
+               (lambda () "unknown-ws")))
+      (should (equal (workbench--popup-terminal-sensible-root)
+                     (expand-file-name "~/code/"))))))
+
+(ert-deftest popup-terminal/sensible-root-rejects-root-directory ()
+  "sensible-root does not return / as the project root."
+  (let ((workbench--workspace-directories (make-hash-table :test 'equal))
+        (workbench-jira-code-root "~/code/"))
+    (cl-letf (((symbol-function 'workbench--project-root)
+               (lambda () "/"))
+              ((symbol-function '+workspace-current-name)
+               (lambda () "ws")))
+      (should-not (equal (workbench--popup-terminal-sensible-root) "/")))))
+
 (provide 'test-terminals)
 ;;; test/unit/test-terminals.el ends here
