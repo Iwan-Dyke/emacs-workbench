@@ -20,6 +20,21 @@
   (or (cdr (assoc tool workbench/ai-commands))
       (user-error "No command configured for AI tool: %s" tool)))
 
+(defun workbench--launch-vterm-agent (buffer-name tool)
+  "Launch TOOL in a fresh vterm BUFFER-NAME in the current window.
+Creates the buffer, resizes it, and sends the launch command after a
+brief delay to allow vterm to initialise."
+  (let ((new-buf (vterm buffer-name)))
+    (workbench--vterm-resize new-buf (selected-window))
+    (let ((b new-buf) (w (selected-window)) (cmd (workbench--ai-command tool)))
+      (run-at-time 0.05 nil
+                   (lambda ()
+                     (when (and (buffer-live-p b) (window-live-p w))
+                       (with-current-buffer b
+                         (workbench--vterm-resize b w)
+                         (vterm-send-string cmd)
+                         (vterm-send-return))))))))
+
 (defun workbench--open-agent-workspace (tool)
   "Open TOOL full-window in the \"ai\" workspace, launching it once.
 If the buffer exists but the process is dead, kills and relaunches it."
@@ -33,28 +48,10 @@ If the buffer exists but the process is dead, kills and relaunches it."
        ;; Dead buffer — kill and relaunch
        (buf
         (kill-buffer buf)
-        (let ((new-buf (vterm buffer-name)))
-          (workbench--vterm-resize new-buf (selected-window))
-          (let ((b new-buf) (w (selected-window)) (cmd (workbench--ai-command tool)))
-            (run-at-time 0.05 nil
-                         (lambda ()
-                           (when (and (buffer-live-p b) (window-live-p w))
-                             (with-current-buffer b
-                               (workbench--vterm-resize b w)
-                               (vterm-send-string cmd)
-                               (vterm-send-return))))))))
+        (workbench--launch-vterm-agent buffer-name tool))
        ;; No buffer — create fresh
        (t
-        (let ((new-buf (vterm buffer-name)))
-          (workbench--vterm-resize new-buf (selected-window))
-          (let ((b new-buf) (w (selected-window)) (cmd (workbench--ai-command tool)))
-            (run-at-time 0.05 nil
-                         (lambda ()
-                           (when (and (buffer-live-p b) (window-live-p w))
-                             (with-current-buffer b
-                               (workbench--vterm-resize b w)
-                               (vterm-send-string cmd)
-                               (vterm-send-return))))))))))
+        (workbench--launch-vterm-agent buffer-name tool))))
     (delete-other-windows)))
 
 (defun workbench/open-default-ai-workspace ()
@@ -94,12 +91,20 @@ Only searches the selected frame to avoid affecting panes on other frames."
     (seq-some (lambda (tool)
                 (when-let ((buffer (get-buffer (format "*project-%s:%s*" tool ws))))
                   (get-buffer-window buffer (selected-frame))))
-              '("codex" "kiro" "claude"))))
+              (mapcar #'car workbench/ai-commands))))
 
 (defun workbench--show-project-ai (tool)
   "Show TOOL as the far-right AI pane for the current workspace.
 Hides any other project AI pane first so only one is visible (exclusive).
 Launches at the project root so the agent sees the whole project."
+  ;; Cancel any pending resize timer from a previous AI pane to prevent
+  ;; accumulation on rapid toggle cycles.
+  (when-let ((existing-buf (get-buffer (workbench--project-ai-buffer-name tool))))
+    (when (buffer-live-p existing-buf)
+      (with-current-buffer existing-buf
+        (when (timerp workbench--ai-pane-resize-timer)
+          (cancel-timer workbench--ai-pane-resize-timer)
+          (setq workbench--ai-pane-resize-timer nil)))))
   (when-let ((other (workbench--project-ai-window)))
     (delete-window other))
   (let* ((buffer-name (workbench--project-ai-buffer-name tool))
@@ -119,7 +124,7 @@ Launches at the project root so the agent sees the whole project."
                   buffer
                   `((display-buffer-in-direction)
                     (direction . right)
-                    (window . main)
+                    (window . root)
                     (window-width . ,(workbench--ai-pane-window-width))))))
     (select-window window)
     (if (not needs-launch)
@@ -264,15 +269,30 @@ Uses buffer-local variables to find the target window and state."
         (when-let ((proc (get-buffer-process buffer)))
           (set-process-window-size proc h w))))))
 
+(defvar workbench--vterm-resize-timer nil
+  "Debounce timer for vterm resize sync.")
+
 (defun workbench--sync-vterm-size (&optional frame)
-  "Resize all visible vterm buffers to match their current window."
-  (dolist (window (window-list (or frame (selected-frame))))
-    (let ((buf (window-buffer window)))
-      (when (and (buffer-live-p buf)
-                 (with-current-buffer buf
-                   (and (derived-mode-p 'vterm-mode)
-                        (boundp 'vterm--term)
-                        vterm--term)))
-        (workbench--vterm-resize buf window)))))
+  "Resize all visible vterm buffers to match their current window.
+Debounced: schedules the actual resize after 0.05s idle to avoid excessive
+calls during interactive window dragging."
+  (when (timerp workbench--vterm-resize-timer)
+    (cancel-timer workbench--vterm-resize-timer))
+  (let ((f (or frame (selected-frame))))
+    (setq workbench--vterm-resize-timer
+          (run-with-idle-timer
+           0.05 nil
+           (lambda ()
+             (setq workbench--vterm-resize-timer nil)
+             (when (frame-live-p f)
+               (dolist (window (window-list f))
+                 (let ((buf (window-buffer window)))
+                   (when (and (buffer-live-p buf)
+                              (window-live-p window)
+                              (with-current-buffer buf
+                                (and (derived-mode-p 'vterm-mode)
+                                     (boundp 'vterm--term)
+                                     vterm--term)))
+                     (workbench--vterm-resize buf window))))))))))
 
 (add-hook 'window-size-change-functions #'workbench--sync-vterm-size)

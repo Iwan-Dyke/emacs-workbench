@@ -317,4 +317,62 @@ This is correct behaviour (ensures full-frame), documenting it."
           (should-not send-called))
       (kill-buffer buf))))
 
+;;; ── Debounced vterm resize ─────────────────────────────────────────────────
+
+(ert-deftest ai/sync-vterm-size-uses-idle-timer ()
+  "workbench--sync-vterm-size schedules an idle timer rather than resizing immediately."
+  (let ((workbench--vterm-resize-timer nil)
+        (timer-created nil))
+    (cl-letf (((symbol-function 'run-with-idle-timer)
+               (lambda (secs _repeat fn &rest _args)
+                 (setq timer-created secs)
+                 (timer-create))))
+      (workbench--sync-vterm-size)
+      (should timer-created)
+      (should (= timer-created 0.05)))))
+
+(ert-deftest ai/sync-vterm-size-cancels-previous-timer ()
+  "Rapid calls to workbench--sync-vterm-size cancel the previous timer."
+  (let* ((workbench--vterm-resize-timer (timer-create))
+         (cancelled nil))
+    (cl-letf (((symbol-function 'cancel-timer)
+               (lambda (_timer) (setq cancelled t)))
+              ((symbol-function 'run-with-idle-timer)
+               (lambda (_secs _repeat _fn &rest _args) (timer-create))))
+      (workbench--sync-vterm-size)
+      (should cancelled))))
+
+;;; ── AI tool list derivation ────────────────────────────────────────────────
+
+(ert-deftest ai/project-ai-window-checks-all-configured-tools ()
+  "workbench--project-ai-window checks buffers for all tools in workbench/ai-commands."
+  (let ((workbench/ai-commands '(("foo" . "foo-cmd") ("bar" . "bar-cmd")))
+        (checked-tools nil))
+    (cl-letf (((symbol-function '+workspace-current-name) (lambda () "test"))
+              ((symbol-function 'get-buffer)
+               (lambda (name) (push name checked-tools) nil)))
+      (workbench--project-ai-window)
+      (should (member "*project-foo:test*" checked-tools))
+      (should (member "*project-bar:test*" checked-tools)))))
+
+;;; ── Launch helper ──────────────────────────────────────────────────────────
+
+(ert-deftest ai/launch-vterm-agent-calls-vterm-with-buffer-name ()
+  "workbench--launch-vterm-agent creates a vterm buffer with the given name."
+  (let ((vterm-buffer-name nil)
+        (resize-called nil)
+        (timer-scheduled nil))
+    (cl-letf (((symbol-function 'vterm)
+               (lambda (name) (setq vterm-buffer-name name) (current-buffer)))
+              ((symbol-function 'workbench--vterm-resize)
+               (lambda (_buf _win) (setq resize-called t)))
+              ((symbol-function 'workbench--ai-command)
+               (lambda (_tool) "claude"))
+              ((symbol-function 'run-at-time)
+               (lambda (_time _repeat _fn) (setq timer-scheduled t))))
+      (workbench--launch-vterm-agent "*test-agent*" "claude")
+      (should (equal vterm-buffer-name "*test-agent*"))
+      (should resize-called)
+      (should timer-scheduled))))
+
 ;;; test-ai.el ends here
