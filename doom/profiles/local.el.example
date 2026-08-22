@@ -1,4 +1,25 @@
 ;;; profiles/local.el.example -*- lexical-binding: t; -*-
 
 ;; Copy to local.el for machine-specific non-secret overrides.
-;; (setq user-full-name "Your Name")
+;; This file is gitignored — DO NOT commit local.el.
+
+(setq user-full-name "Your Name")
+
+;; Jira config (required for command centre and org agenda sync)
+;; (setq workbench-jira-project "DPT"
+;;       workbench-jira-user "your.name@example.com"
+;;       workbench-jira-git-author "your-name")
+
+;; Code root — where your repos live (used for git commit scanning)
+;; (setq workbench-jira-code-root "~/code/")
+
+;; Team config (required for team-lead command centre view)
+;; (setq workbench-jira-team-name "Your Team"
+;;       workbench-jira-team-id "uuid-from-jira-rest-api"
+;;       workbench-jira-team-wip-limit 2
+;;       workbench-jira-status-next "Next"
+;;       workbench-jira-team-members
+;;       '("Alice Smith" "Bob Jones"))
+
+;; Repos dashboard — directories to scan for git repos
+;; (setq workbench-repos-roots '("~/code/" "~/projects/"))
