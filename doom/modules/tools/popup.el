@@ -44,6 +44,9 @@ Selects the primary editing window after restoration."
              (eq (window-configuration-frame config) (selected-frame)))
         (progn
           (set-window-configuration config)
+          ;; Guard against stale configs referencing killed buffers
+          (unless (buffer-live-p (window-buffer))
+            (switch-to-buffer (other-buffer)))
           (select-window (workbench-popup-primary-window)))
       ;; Config is stale — bury and select primary
       (when (and buffer-to-bury (buffer-live-p buffer-to-bury))

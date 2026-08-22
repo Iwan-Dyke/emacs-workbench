@@ -54,33 +54,39 @@ NAME is a human-readable label for log messages (default: KEY symbol name)."
                   :sentinel
                   (lambda (process _event)
                     (when (memq (process-status process) '(exit signal))
-                      ;; Cancel timeout
+                      ;; Verify this sentinel belongs to the current operation
+                      ;; for this key. A rapid re-call may have replaced us.
                       (let ((entry (gethash key workbench-async--processes)))
-                        (when (and entry (timerp (cdr entry)))
-                          (cancel-timer (cdr entry))))
-                      (unwind-protect
-                          (let ((result nil))
-                            (when (zerop (process-exit-status process))
-                              (when (buffer-live-p (process-buffer process))
-                                (with-current-buffer (process-buffer process)
-                                  (goto-char (point-min))
-                                  (condition-case nil
-                                      (setq result (read (current-buffer)))
-                                    (error
-                                     (message "%s: failed to parse output"
-                                              label))))))
-                            (when (not (zerop (process-exit-status process)))
-                              (message "%s: process exited %d"
-                                       label (process-exit-status process)))
-                            (remhash key workbench-async--processes)
-                            (condition-case err
-                                (funcall callback result)
-                              (error
-                               (message "%s: callback error: %s"
-                                        label (error-message-string err)))))
-                        ;; Always kill the output buffer
-                        (when (buffer-live-p (process-buffer process))
-                          (kill-buffer (process-buffer process))))))))
+                        (if (not (and entry (eq process (car entry))))
+                            ;; Stale sentinel — just clean up buffer and exit
+                            (when (buffer-live-p (process-buffer process))
+                              (kill-buffer (process-buffer process)))
+                          ;; Active sentinel — proceed
+                          (when (timerp (cdr entry))
+                            (cancel-timer (cdr entry)))
+                          (unwind-protect
+                              (let ((result nil))
+                                (when (zerop (process-exit-status process))
+                                  (when (buffer-live-p (process-buffer process))
+                                    (with-current-buffer (process-buffer process)
+                                      (goto-char (point-min))
+                                      (condition-case nil
+                                          (setq result (read (current-buffer)))
+                                        (error
+                                         (message "%s: failed to parse output"
+                                                  label))))))
+                                (when (not (zerop (process-exit-status process)))
+                                  (message "%s: process exited %d"
+                                           label (process-exit-status process)))
+                                (remhash key workbench-async--processes)
+                                (condition-case err
+                                    (funcall callback result)
+                                  (error
+                                   (message "%s: callback error: %s"
+                                            label (error-message-string err)))))
+                            ;; Always kill the output buffer
+                            (when (buffer-live-p (process-buffer process))
+                              (kill-buffer (process-buffer process))))))))))
            ;; Timeout timer
            (timer (run-at-time
                    timeout-secs nil

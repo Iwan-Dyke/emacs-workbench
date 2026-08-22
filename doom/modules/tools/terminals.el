@@ -29,6 +29,9 @@ Starts in the current project root (or a sensible fallback if outside a project)
   "Hash table mapping workspace name → saved window configuration.
 Non-nil entry means the popup is active in that workspace.")
 
+(defvar workbench--popup-terminal-buffers (make-hash-table :test 'equal)
+  "Hash table mapping workspace name → popup terminal buffer.")
+
 (defun workbench--popup-terminal-buffer-name ()
   "Return the popup buffer name for the current workspace."
   (format "*workbench-popup-term:%s*" (+workspace-current-name)))
@@ -58,13 +61,16 @@ is displayed so the terminal gets correct window dimensions on first draw."
          (buffer (get-buffer name)))
     (if (and (buffer-live-p buffer)
              (with-current-buffer buffer (derived-mode-p 'vterm-mode)))
-        buffer
+        (progn
+          (puthash (+workspace-current-name) buffer workbench--popup-terminal-buffers)
+          buffer)
       ;; Buffer is dead or not in vterm-mode — kill and start fresh
       (when (buffer-live-p buffer)
         (kill-buffer buffer))
       (let ((root (workbench--popup-terminal-sensible-root)))
         (with-current-buffer (get-buffer-create name)
           (setq default-directory root)
+          (puthash (+workspace-current-name) (current-buffer) workbench--popup-terminal-buffers)
           (current-buffer))))))
 
 (defun workbench--popup-terminal-showing-p ()
@@ -108,13 +114,13 @@ was focused when the popup was opened."
 (defun workbench--popup-terminal-clear-stale (&rest _)
   "Discard stale popup terminal state when workspace layout changes."
   (workbench-popup-clear-stale workbench--popup-terminal-configs
-                               workbench--popup-terminal-configs  ; no separate buffers hash
+                               workbench--popup-terminal-buffers
                                #'workbench--popup-terminal-showing-p))
 
 (defun workbench--popup-terminal-clear-frame (frame)
   "Remove popup terminal entries for FRAME on frame deletion."
   (workbench-popup-clear-frame workbench--popup-terminal-configs
-                               workbench--popup-terminal-configs
+                               workbench--popup-terminal-buffers
                                frame))
 
 (add-hook 'persp-activated-functions #'workbench--popup-terminal-clear-stale)
