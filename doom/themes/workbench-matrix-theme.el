@@ -100,9 +100,7 @@
    ;; Which-key popup
    (which-key-key-face :foreground green :weight 'bold)
    (which-key-command-description-face :foreground fg)
-   (which-key-group-description-face :foreground cyan)
-   ;; Font
-   (default :family "Share Tech Mono" :height 140 :foreground fg :background bg))
+   (which-key-group-description-face :foreground cyan))
 
   ;;;; Variable overrides
   ())

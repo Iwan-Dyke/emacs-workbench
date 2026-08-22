@@ -22,10 +22,12 @@
 
 ;; Enable hl-line in project dashboard (not a lin candidate since it's
 ;; not strictly line-selection, but the highlight helps readability)
-(add-hook 'special-mode-hook
-          (lambda ()
-            (when (string-prefix-p "*workbench:" (buffer-name))
-              (hl-line-mode 1))))
+(defun workbench--maybe-enable-hl-line ()
+  "Enable hl-line in workbench special-mode buffers."
+  (when (string-prefix-p "*workbench:" (buffer-name))
+    (hl-line-mode 1)))
+
+(add-hook 'special-mode-hook #'workbench--maybe-enable-hl-line)
 
 ;;; ── Org-modern (clean org visuals) ─────────────────────────────────────────
 
@@ -102,10 +104,10 @@
 ;;; ── Zone-matrix screensaver ────────────────────────────────────────────────
 
 (after! zone
-  (when (require 'zone-matrix nil t)
+  (when (and (require 'zone-matrix nil t)
+             (string= workbench/profile "personal"))
     (setq zone-programs [zone-matrix])
     (when (fboundp 'zone-when-idle)
       (zone-when-idle 300))))
 
-(provide 'workbench-visual)
 ;;; visual.el ends here

@@ -66,5 +66,56 @@
   "Agenda block separator uses a horizontal line character."
   (should (equal org-agenda-block-separator ?─)))
 
+;;; ── hl-line named function ─────────────────────────────────────────────────
+
+(ert-deftest visual/hl-line-hook-is-named-function ()
+  "special-mode-hook uses the named function, not a lambda."
+  (should (memq #'workbench--maybe-enable-hl-line (default-value 'special-mode-hook))))
+
+(ert-deftest visual/hl-line-activates-for-workbench-buffers ()
+  "workbench--maybe-enable-hl-line enables hl-line in *workbench:* buffers."
+  (with-temp-buffer
+    (rename-buffer "*workbench:test*" t)
+    (special-mode)
+    (workbench--maybe-enable-hl-line)
+    (should (bound-and-true-p hl-line-mode))))
+
+(ert-deftest visual/hl-line-skips-non-workbench-buffers ()
+  "workbench--maybe-enable-hl-line does NOT enable hl-line in other buffers."
+  (with-temp-buffer
+    (rename-buffer "*Help*" t)
+    (special-mode)
+    (workbench--maybe-enable-hl-line)
+    (should-not (bound-and-true-p hl-line-mode))))
+
+;;; ── Matrix theme font ──────────────────────────────────────────────────────
+
+(ert-deftest visual/matrix-theme-no-font-override ()
+  "Matrix theme should not set font family/height in face overrides."
+  (let* ((theme-file (expand-file-name "doom/themes/workbench-matrix-theme.el"
+                                        workbench-test-root))
+         (content (with-temp-buffer
+                    (insert-file-contents theme-file)
+                    (buffer-string))))
+    ;; The face overrides section starts after "Face overrides". Check that
+    ;; no (default :family ...) face spec exists there.
+    (let ((face-section (when (string-match "Face overrides" content)
+                          (substring content (match-beginning 0)))))
+      (should face-section)
+      (should-not (string-match-p "default.*:family" face-section))
+      (should-not (string-match-p "default.*:height" face-section)))))
+
+;;; ── Languages config ───────────────────────────────────────────────────────
+
+(ert-deftest visual/pandoc-paths-not-hardcoded ()
+  "Markdown command should not contain hardcoded absolute user paths."
+  (let* ((lang-file (expand-file-name "doom/modules/tools/languages.el"
+                                       workbench-test-root))
+         (content (with-temp-buffer
+                    (insert-file-contents lang-file)
+                    (buffer-string))))
+    (should-not (string-match-p "/Users/" content))
+    (should (string-match-p "expand-file-name" content))))
+
 (provide 'test-visual)
 ;;; test-visual.el ends here
