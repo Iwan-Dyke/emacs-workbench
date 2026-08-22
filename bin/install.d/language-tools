@@ -33,18 +33,18 @@ apt_optional_language_packages=(
 )
 
 npm_language_packages=(
-    pyright
-    bash-language-server
-    yaml-language-server
-    dockerfile-language-server-nodejs
-    @mermaid-js/mermaid-cli
+    "pyright@1.1.411"
+    "bash-language-server@5.4.3"
+    "yaml-language-server@1.18.0"
+    "dockerfile-language-server-nodejs@0.13.0"
+    "@mermaid-js/mermaid-cli@11.4.2"
 )
 
 go_language_packages=(
-    golang.org/x/tools/gopls@latest
-    github.com/hashicorp/terraform-ls@latest
-    github.com/sqls-server/sqls@latest
-    github.com/google/yamlfmt/cmd/yamlfmt@latest
+    "golang.org/x/tools/gopls@v0.18.1"
+    "github.com/hashicorp/terraform-ls@v0.36.6"
+    "github.com/sqls-server/sqls@v0.2.28"
+    "github.com/google/yamlfmt/cmd/yamlfmt@v0.16.0"
 )
 
 go_language_commands=(

@@ -119,6 +119,7 @@ install_apt_platform_tools() {
 # boxes. Non-fatal: a missing font only affects appearance, so failures warn
 # rather than fail the whole install.
 nerd_font_url="https://raw.githubusercontent.com/rainstormstudio/nerd-icons.el/main/fonts/NFM.ttf"
+nerd_font_sha256="f0f624d9b474bea1662cf7e862d44aebe1ae1f6c7f9cb7a0ca5d0e5ac9561c60"
 
 install_icon_fonts() {
     local fonts_dir font_path
@@ -149,6 +150,20 @@ install_icon_fonts() {
         }
     else
         warn "neither curl nor wget found; skipping nerd-icons font"
+        return
+    fi
+
+    # Verify integrity
+    local actual_sha
+    if have_command shasum; then
+        actual_sha=$(shasum -a 256 "$font_path" | awk '{print $1}')
+    elif have_command sha256sum; then
+        actual_sha=$(sha256sum "$font_path" | awk '{print $1}')
+    fi
+
+    if [ -n "$actual_sha" ] && [ "$actual_sha" != "$nerd_font_sha256" ]; then
+        rm -f "$font_path"
+        warn "nerd-icons font checksum mismatch (possible tampering); removed"
         return
     fi
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -u
+umask 077
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 doom_source="$repo_root/doom"
@@ -341,6 +342,21 @@ run_doctor_report() {
     must_run "run workbench doctor" "$repo_root/bin/doctor"
 }
 
+harden_secrets_permissions() {
+    local secrets_file="$doom_source/profiles/secrets.el"
+    local local_file="$doom_source/profiles/local.el"
+
+    if [ -f "$secrets_file" ]; then
+        chmod 600 "$secrets_file"
+        ok "secrets.el permissions set to 600"
+    fi
+
+    if [ -f "$local_file" ]; then
+        chmod 600 "$local_file"
+        ok "local.el permissions set to 600"
+    fi
+}
+
 print_next_steps() {
     printf "Next:\n"
     printf "  startup\n"
@@ -362,6 +378,7 @@ run_if_ok bootstrap_org_directory
 run_if_ok run_doom_sync
 run_if_ok run_doom_env_if_needed
 run_if_ok install_language_tools
+run_if_ok harden_secrets_permissions
 run_if_ok run_doctor_report
 
 printf "\n"
