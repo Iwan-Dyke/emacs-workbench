@@ -295,11 +295,15 @@
       (insert "\n")
       (let ((rendered (with-temp-buffer
                         (insert-file-contents readme nil 0 4000)
-                        (if (string-suffix-p ".org" readme)
-                            (org-mode)
-                          (when (fboundp 'markdown-mode)
-                            (markdown-mode)
-                            (font-lock-ensure)))
+                        ;; Disable file-local variables and eval to prevent
+                        ;; malicious README files from executing code.
+                        (let ((enable-local-variables nil)
+                              (enable-local-eval nil))
+                          (if (string-suffix-p ".org" readme)
+                              (org-mode)
+                            (when (fboundp 'markdown-mode)
+                              (markdown-mode)
+                              (font-lock-ensure))))
                         (buffer-string))))
         (insert rendered)
         (unless (string-suffix-p "\n" rendered)
