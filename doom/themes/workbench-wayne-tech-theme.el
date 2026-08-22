@@ -77,11 +77,24 @@
    (mode-line :background modeline-bg :foreground modeline-fg)
    (mode-line-inactive :background modeline-bg-inactive :foreground modeline-fg-alt)
    (mode-line-emphasis :foreground blue)
+   (cursor :background blue)
    (doom-modeline-bar :background blue)
    (doom-modeline-buffer-file :inherit 'mode-line-buffer-id :weight 'bold)
    (treemacs-root-face :foreground blue :weight 'bold :height 1.1)
    (treemacs-git-modified-face :foreground orange)
-   (treemacs-git-added-face :foreground green))
+   (treemacs-git-added-face :foreground green)
+   ;; Selection/highlight
+   (highlight :background base3 :foreground fg)
+   (vertico-current :background base3 :foreground fg :weight 'bold)
+   (completions-common-part :foreground blue :weight 'bold)
+   (completions-first-difference :foreground cyan)
+   (orderless-match-face-0 :foreground blue :weight 'bold)
+   (orderless-match-face-1 :foreground cyan :weight 'bold)
+   (orderless-match-face-2 :foreground teal :weight 'bold)
+   (orderless-match-face-3 :foreground green :weight 'bold)
+   ;; Workspace tabs
+   (+workspace-tab-selected-face :background base3 :foreground blue :weight 'bold)
+   (+workspace-tab-face :foreground base6))
 
   ;;;; Variable overrides
   ())

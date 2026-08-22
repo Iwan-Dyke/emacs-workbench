@@ -28,14 +28,14 @@
 
    (grey       base4)
    (red        '("#ff2020" "#ff6655"   "red"          ))
-   (orange     '("#7aff41" "#dd8844"   "brightred"    ))
+   (orange     '("#7aff41" "#00ff00"   "green"        ))
    (green      '("#00ff41" "#00ff00"   "green"        ))
    (teal       '("#00cc66" "#44b9b1"   "brightgreen"  ))
    (yellow     '("#80ff00" "#ECBE7B"   "yellow"       ))
    (blue       '("#00ff99" "#51afef"   "brightblue"   ))
    (dark-blue  '("#006633" "#2257A0"   "blue"         ))
-   (magenta    '("#00ff80" "#c678dd"   "brightmagenta"))
-   (violet     '("#66ffaa" "#a9a1e1"   "magenta"      ))
+   (magenta    '("#00ff80" "#00ff00"   "green"        ))
+   (violet     '("#66ffaa" "#00ff00"   "green"        ))
    (cyan       '("#33ffcc" "#46D9FF"   "brightcyan"   ))
    (dark-cyan  '("#00804d" "#5699AF"   "cyan"         ))
 
