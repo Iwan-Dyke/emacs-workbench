@@ -214,7 +214,15 @@ failure. Kills the child process after 60 seconds if it hangs."
       (workbench-cc-refresh)))
   (unless workbench-cc--timer
     (setq workbench-cc--timer
-          (run-at-time 300 300 #'workbench-cc--maybe-refresh))))
+          (run-at-time 300 300 #'workbench-cc--maybe-refresh)))
+  ;; Cancel the refresh timer if the buffer is killed to avoid leaked timers.
+  (add-hook 'kill-buffer-hook #'workbench-cc--cancel-timer-on-kill nil t))
+
+(defun workbench-cc--cancel-timer-on-kill ()
+  "Cancel the command centre refresh timer when its buffer is killed."
+  (when (timerp workbench-cc--timer)
+    (cancel-timer workbench-cc--timer)
+    (setq workbench-cc--timer nil)))
 
 (defun workbench-cc--startup ()
   "Show command centre on startup (work profile only).

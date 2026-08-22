@@ -76,7 +76,7 @@
   "Render DATA as a visual SVG dashboard."
   (let* ((buf (get-buffer-create workbench-cc--buffer-name))
          (win (or (get-buffer-window buf) (selected-window)))
-         (scale (or (and (fboundp 'frame-scale-factor) (frame-scale-factor)) 1))
+         (scale (max 1 (or (and (fboundp 'frame-scale-factor) (frame-scale-factor)) 1)))
          (w (round (* (window-pixel-width win) scale)))
          (h (round (* (window-pixel-height win) scale)))
          (colours (workbench-cc--colours))
@@ -128,7 +128,7 @@
            (gauge-cx (+ pad gauge-r (funcall s 10)))
            (gauge-cy (+ y gauge-r))
            (gauge-width (funcall s 10))
-           (angle (* 360.0 (/ (min (float wip-count) wip-limit) wip-limit)))
+           (angle (min 359.9 (* 360.0 (/ (min (float wip-count) wip-limit) wip-limit))))
            (gauge-colour (cond ((>= wip-count wip-limit) red)
                                ((>= wip-count (- wip-limit 2)) yellow)
                                (t green))))
