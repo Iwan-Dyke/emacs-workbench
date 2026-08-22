@@ -28,12 +28,14 @@
 Spawns a child Emacs via `workbench-async-eval' that loads the data module
 and runs the appropriate collect function. CALLBACK receives the parsed
 plist on success, or nil on failure."
-  (let* ((jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
+  (let* ((shell-file (expand-file-name "modules/tools/shell.el" doom-user-dir))
+         (jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
          (data-file (expand-file-name "modules/workflows/command-centre-data.el"
                                       doom-user-dir))
          (view workbench/command-centre-view)
          (form `(progn
                   (require 'seq)
+                  (load ,shell-file nil t)
                   (setq workbench-jira-project ,workbench-jira-project
                         workbench-jira-user ,workbench-jira-user
                         workbench-jira-git-author ,workbench-jira-git-author
@@ -68,6 +70,7 @@ plist on success, or nil on failure."
            (setq workbench-cc--fetch-failure-count 0)
            ;; If the jira timer was started as a fallback, stop it — CC is healthy again.
            (when workbench-jira--timer
+             (setq workbench-jira-external-refresh-p t)
              (workbench-jira-stop-timer))
            (setq workbench-cc--data data)
            ;; Populate the shared Jira cache from CC data so org module stays in sync.
@@ -77,12 +80,9 @@ plist on success, or nil on failure."
            ;; doesn't fetch personal tickets so we must not overwrite with nil.
            (let ((tickets (plist-get data :tickets)))
              (when (and tickets (not (workbench-jira-error-p tickets)))
-               (setq workbench-jira--cache
-                     (list :tickets tickets
-                           :done (plist-get data :done)
-                           :next (plist-get data :next)))
-               (setq workbench-jira--cache-time (current-time))
-               (run-hooks 'workbench-jira-after-refresh-hook)))
+               (workbench-jira-set-cache tickets
+                                         (plist-get data :done)
+                                         (plist-get data :next))))
            (when (buffer-live-p (get-buffer workbench-cc--buffer-name))
              (workbench-cc--render-current))
            (message "Command centre: refreshed"))
@@ -95,6 +95,7 @@ plist on success, or nil on failure."
        (when (and (>= workbench-cc--fetch-failure-count 3)
                   (not workbench-jira--timer))
          (message "Command centre: enabling Jira timer fallback")
+         (setq workbench-jira-external-refresh-p nil)
          (workbench-jira-start-timer))))))
 
 (defun workbench-cc-refresh-sync ()
@@ -179,9 +180,8 @@ startup workspaces have been created. This avoids a race where session.el
 switches back to the dashboard workspace and buries the command centre buffer."
   (when (string= workbench/profile "work")
     ;; Prevent the Jira module's own timer from starting — the CC timer handles
-    ;; all Jira fetching and populates the shared cache. Remove the named hook
-    ;; function so it never fires.
-    (remove-hook 'doom-init-ui-hook #'workbench-jira--maybe-start-timer)
+    ;; all Jira fetching and populates the shared cache.
+    (setq workbench-jira-external-refresh-p t)
     (workbench-jira-stop-timer)
     (setq +dashboard-functions nil
           initial-buffer-choice nil)

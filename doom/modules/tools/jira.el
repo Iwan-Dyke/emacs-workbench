@@ -221,6 +221,10 @@ output will return nil.  Configure jira-cli to use ISO date output
   "Hook run after Jira data is refreshed. Called with no arguments.
 Consumers (command centre, org) add functions here to react to new data.")
 
+(defvar workbench-jira-external-refresh-p nil
+  "When non-nil, the Jira module defers to an external refresh owner (e.g. command centre).
+The auto-refresh timer will not start.")
+
 (defun workbench-jira-cache ()
   "Return the current Jira cache plist, or nil if not yet populated."
   workbench-jira--cache)
@@ -235,11 +239,12 @@ Consumers (command centre, org) add functions here to react to new data.")
        (< (float-time (time-subtract (current-time) workbench-jira--cache-time))
           workbench-jira-refresh-interval)))
 
-(defvar workbench-jira--async-process nil
-  "Current async Jira refresh process, or nil.")
-
-(defvar workbench-jira--async-timeout nil
-  "Timeout timer for the current async Jira refresh.")
+(defun workbench-jira-set-cache (tickets done next)
+  "Update the shared Jira cache with TICKETS, DONE, and NEXT data.
+Sets the cache timestamp and runs `workbench-jira-after-refresh-hook'."
+  (setq workbench-jira--cache (list :tickets tickets :done done :next next))
+  (setq workbench-jira--cache-time (current-time))
+  (run-hooks 'workbench-jira-after-refresh-hook))
 
 (defun workbench-jira-refresh-sync ()
   "Refresh the Jira cache synchronously and run hooks.
@@ -271,8 +276,10 @@ Accepts partial results — only stores keys that succeeded."
 Spawns a child Emacs (batch) via `workbench-async-eval' that runs the
 three fetch calls and returns the result as a plist."
   (interactive)
-  (let* ((jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
+  (let* ((shell-file (expand-file-name "modules/tools/shell.el" doom-user-dir))
+         (jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
          (form `(progn
+                  (load ,shell-file nil t)
                   (setq workbench-jira-project ,workbench-jira-project
                         workbench-jira-user ,workbench-jira-user
                         workbench-jira-git-author ,workbench-jira-git-author
@@ -335,8 +342,9 @@ three fetch calls and returns the result as a plist."
     (setq workbench-jira--timer nil)))
 
 (defun workbench-jira--maybe-start-timer ()
-  "Start the Jira refresh timer if project and user are configured."
-  (when (and workbench-jira-project workbench-jira-user)
+  "Start the Jira refresh timer if project and user are configured and no external owner."
+  (when (and workbench-jira-project workbench-jira-user
+             (not workbench-jira-external-refresh-p))
     (workbench-jira-start-timer)))
 
 ;; Start the timer when Jira is configured
