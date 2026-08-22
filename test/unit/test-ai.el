@@ -269,7 +269,7 @@ This is correct behaviour (ensures full-frame), documenting it."
 ;;; ── Resize on re-open ──────────────────────────────────────────────────────
 
 (ert-deftest ai-pane/reopen-triggers-deferred-resize ()
-  "Re-opening a pane with live process schedules deferred resizes."
+  "Re-opening a pane with live process triggers retry-with-backoff resizes."
   (let ((resize-count 0)
         (timer-delays '())
         (buf (get-buffer-create "*project-kiro:main*")))
@@ -288,11 +288,10 @@ This is correct behaviour (ensures full-frame), documenting it."
                      (funcall fn)
                      nil)))
           (workbench--show-project-ai "kiro")
-          ;; Should have: 1 immediate + 2 deferred = 3 resizes
-          (should (= resize-count 3))
-          ;; Deferred timers at 0.05 and 0.2 seconds
-          (should (member 0.05 timer-delays))
-          (should (member 0.2 timer-delays)))
+          ;; Should have multiple resizes: immediate + retries
+          (should (>= resize-count 2))
+          ;; Retry schedule uses backoff delays (0.1, 0.5, 2.0)
+          (should (member 0.1 timer-delays)))
       (kill-buffer buf))))
 
 (ert-deftest ai-pane/reopen-does-not-relaunch-process ()

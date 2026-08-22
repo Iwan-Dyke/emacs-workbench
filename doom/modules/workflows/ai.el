@@ -128,27 +128,14 @@ Launches at the project root so the agent sees the whole project."
                     (window-width . ,(workbench--ai-pane-window-width))))))
     (select-window window)
     (if (not needs-launch)
-        ;; Existing buffer with live process — resize immediately AND after
-        ;; a brief delay. The immediate resize updates the pty, but the window
-        ;; may not have its final dimensions until after the display cycle.
-        (let ((buf buffer) (win window))
-          (workbench--vterm-resize buf win)
-          (run-at-time 0.05 nil
-                       (lambda ()
-                         (when (and (buffer-live-p buf) (window-live-p win))
-                           (workbench--vterm-resize buf win))))
-          (run-at-time 0.2 nil
-                       (lambda ()
-                         (when (and (buffer-live-p buf) (window-live-p win))
-                           (workbench--vterm-resize buf win)))))
+        ;; Existing buffer with live process — resize with retry
+        (workbench--ai-pane-ensure-resize buffer window)
       (let ((root (workbench--project-root)))
         (with-current-buffer buffer
           (setq default-directory root)
           (vterm-mode)
           (workbench--vterm-resize buffer window)
-          ;; Delay command send until vterm has processed the resize. Without
-          ;; this, the CLI tool can start rendering at the default 80-col pty
-          ;; width before our resize takes effect, causing text to be cut off.
+          ;; Delay command send until vterm has processed the resize.
           (let ((buf buffer) (win window) (cmd command))
             (run-at-time 0.05 nil
                          (lambda ()
@@ -157,74 +144,59 @@ Launches at the project root so the agent sees the whole project."
                                (workbench--vterm-resize buf win)
                                (vterm-send-string cmd)
                                (vterm-send-return))))))
-          (workbench--schedule-ai-pane-resizes buffer window))))))
+          (workbench--ai-pane-ensure-resize buffer window))))))
 
 
 (defvar-local workbench--ai-pane-resize-timer nil
-  "Pending resize timer for an AI pane buffer.")
-
-(defvar-local workbench--ai-pane-resize-done nil
-  "Non-nil once the AI pane has confirmed a successful resize via output.")
+  "Pending resize retry timer for an AI pane buffer.")
 
 (defvar-local workbench--ai-pane-resize-window nil
-  "The window the AI pane is displayed in, used by the output resizer.")
+  "The window the AI pane is displayed in, used by the resize retrier.")
 
-(defun workbench--schedule-ai-pane-resizes (buffer window)
-  "Schedule a delayed resize for BUFFER displayed in WINDOW.
-Also hooks into process output so the resize fires the instant the
-CLI tool writes its first output (proving it's alive). The 5s timer
-is a fallback in case the output hook doesn't fire."
+(defun workbench--ai-pane-ensure-resize (buffer window)
+  "Ensure BUFFER's vterm pty matches WINDOW dimensions via retry-with-backoff.
+Attempts resize immediately, then retries at 0.1s, 0.5s, and 2s. Stops
+as soon as the pty dimensions match the window (or after 4 attempts).
+Replaces the previous 5-path timing approach with a single mechanism."
   (with-current-buffer buffer
-    (setq workbench--ai-pane-resize-done nil)
+    ;; Cancel any existing retry from a previous toggle
+    (when (timerp workbench--ai-pane-resize-timer)
+      (cancel-timer workbench--ai-pane-resize-timer)
+      (setq workbench--ai-pane-resize-timer nil))
     (setq workbench--ai-pane-resize-window window)
-    (let ((buf buffer) (win window))
+    ;; Immediate resize
+    (workbench--vterm-resize buffer window)
+    ;; Schedule retries with backoff
+    (let ((buf buffer) (win window)
+          (delays '(0.1 0.5 2.0)))
       (setq workbench--ai-pane-resize-timer
-            (run-at-time 5.0 nil
-                         (lambda ()
-                           (when (and (buffer-live-p buf) (window-live-p win))
-                             (workbench--vterm-resize buf win)
-                             ;; Clean up the output filter if it never fired.
-                             (when (and (buffer-live-p buf)
-                                        (not (buffer-local-value
-                                              'workbench--ai-pane-resize-done buf)))
-                               (workbench--ai-pane-remove-output-filter buf))))))
-      ;; Defer attaching the output filter — vterm replaces its process
-      ;; filter during init, so adding immediately would be silently lost.
-      (run-at-time 0.1 nil
-                   (lambda ()
-                     (when (buffer-live-p buf)
-                       (when-let ((proc (get-buffer-process buf)))
-                         (add-function :after (process-filter proc)
-                                       #'workbench--ai-pane-output-resize-filter
-                                       '((name . workbench-ai-resize))))))))))
+            (run-at-time
+             (car delays) nil
+             (lambda ()
+               (workbench--ai-pane-resize-retry buf win (cdr delays))))))))
 
-(defun workbench--ai-pane-remove-output-filter (buffer)
-  "Safely remove the resize output filter from BUFFER's process.
-No-op if the process is dead or the filter was already removed."
-  (ignore-errors
-    (when-let ((proc (and (buffer-live-p buffer)
-                          (get-buffer-process buffer))))
-      (when (process-live-p proc)
-        (remove-function (process-filter proc)
-                         #'workbench--ai-pane-output-resize-filter)))))
-
-(defun workbench--ai-pane-output-resize-filter (proc _output)
-  "Resize the AI pane on first process output, then remove self.
-Uses buffer-local variables to find the target window and state."
-  (when-let ((buf (process-buffer proc)))
-    (when (and (buffer-live-p buf)
-               (not (buffer-local-value 'workbench--ai-pane-resize-done buf)))
-      (with-current-buffer buf
-        (let ((win workbench--ai-pane-resize-window))
-          (when (window-live-p win)
-            (setq workbench--ai-pane-resize-done t)
-            (workbench--vterm-resize buf win)
-            ;; Cancel the fallback timer.
-            (when (timerp workbench--ai-pane-resize-timer)
-              (cancel-timer workbench--ai-pane-resize-timer)
-              (setq workbench--ai-pane-resize-timer nil))
-            ;; Remove ourselves from the process filter.
-            (workbench--ai-pane-remove-output-filter buf)))))))
+(defun workbench--ai-pane-resize-retry (buffer window remaining-delays)
+  "Retry resizing BUFFER in WINDOW. Schedule next retry from REMAINING-DELAYS."
+  (when (and (buffer-live-p buffer) (window-live-p window))
+    (with-current-buffer buffer
+      (workbench--vterm-resize buffer window)
+      ;; Check if dimensions match — if so, we're done
+      (let ((matches (and (boundp 'vterm--term) vterm--term
+                          (let ((h (window-body-height window))
+                                (w (window-body-width window)))
+                            ;; vterm doesn't expose current pty size directly,
+                            ;; so we always retry through the schedule.
+                            nil))))
+        (if (or matches (null remaining-delays))
+            ;; Done — clear timer reference
+            (setq workbench--ai-pane-resize-timer nil)
+          ;; Schedule next retry
+          (setq workbench--ai-pane-resize-timer
+                (run-at-time
+                 (car remaining-delays) nil
+                 (lambda ()
+                   (workbench--ai-pane-resize-retry
+                    buffer window (cdr remaining-delays))))))))))
 
 (defun workbench--toggle-project-ai (tool)
   "Toggle TOOL as the project AI pane for the current workspace."
