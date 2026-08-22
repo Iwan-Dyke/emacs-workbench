@@ -69,7 +69,7 @@
 
 (ert-deftest repos/parse-status-clean ()
   "Parses a clean repo status from git output."
-  (cl-letf (((symbol-function 'workbench-repos--shell)
+  (cl-letf (((symbol-function 'workbench-shell)
              (lambda (_dir &rest args)
                (pcase (car args)
                  ("git" (pcase (cadr args)
@@ -87,7 +87,7 @@
 
 (ert-deftest repos/parse-status-dirty ()
   "Parses a dirty repo with modified and untracked files."
-  (cl-letf (((symbol-function 'workbench-repos--shell)
+  (cl-letf (((symbol-function 'workbench-shell)
              (lambda (_dir &rest args)
                (pcase (car args)
                  ("git" (pcase (cadr args)
@@ -106,7 +106,7 @@
 
 (ert-deftest repos/parse-status-no-remote ()
   "Handles repos with no upstream (rev-list fails)."
-  (cl-letf (((symbol-function 'workbench-repos--shell)
+  (cl-letf (((symbol-function 'workbench-shell)
              (lambda (_dir &rest args)
                (pcase (car args)
                  ("git" (pcase (cadr args)
@@ -121,7 +121,7 @@
 
 (ert-deftest repos/parse-status-detached-head ()
   "Handles detached HEAD (branch is empty)."
-  (cl-letf (((symbol-function 'workbench-repos--shell)
+  (cl-letf (((symbol-function 'workbench-shell)
              (lambda (_dir &rest args)
                (pcase (car args)
                  ("git" (pcase (cadr args)
@@ -271,19 +271,19 @@
 
 (ert-deftest repos/parse-status-name-from-path ()
   "Status extracts repo name from the directory path."
-  (cl-letf (((symbol-function 'workbench-repos--shell) (lambda (&rest _) nil)))
+  (cl-letf (((symbol-function 'workbench-shell) (lambda (&rest _) nil)))
     (let ((status (workbench-repos--repo-status "/Users/dev/code/my-project")))
       (should (equal (plist-get status :name) "my-project")))))
 
 (ert-deftest repos/parse-status-path-preserved ()
   "Status preserves the full path."
-  (cl-letf (((symbol-function 'workbench-repos--shell) (lambda (&rest _) nil)))
+  (cl-letf (((symbol-function 'workbench-shell) (lambda (&rest _) nil)))
     (let ((status (workbench-repos--repo-status "/Users/dev/code/my-project")))
       (should (equal (plist-get status :path) "/Users/dev/code/my-project")))))
 
 (ert-deftest repos/parse-status-all-nil-is-safe ()
   "Status handles all git commands returning nil (broken repo)."
-  (cl-letf (((symbol-function 'workbench-repos--shell) (lambda (&rest _) nil)))
+  (cl-letf (((symbol-function 'workbench-shell) (lambda (&rest _) nil)))
     (let ((status (workbench-repos--repo-status "/tmp/broken-repo")))
       (should (equal (plist-get status :branch) "(detached)"))
       (should (equal (plist-get status :state) 'clean))
@@ -295,7 +295,7 @@
 
 (ert-deftest repos/parse-status-only-untracked ()
   "Repo with only untracked files is dirty."
-  (cl-letf (((symbol-function 'workbench-repos--shell)
+  (cl-letf (((symbol-function 'workbench-shell)
              (lambda (_dir &rest args)
                (pcase (car args)
                  ("git" (pcase (cadr args)

@@ -829,7 +829,7 @@ test_additional_keybindings() {
 
     assert_equal "SPC n d → discover ADRs" \
         '(lookup-key doom-leader-map "nd")' \
-        "workbench-org-discover-adrs"
+        "workbench-org/discover-adrs"
 
     assert_equal "SPC p O → project workspace dwim" \
         '(lookup-key doom-leader-map "pO")' \

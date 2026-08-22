@@ -163,7 +163,7 @@ Verifies the binding uses `:nvm` prefix so insert-state backspace is preserved."
 ;;; ════════════════════════════════════════════════════════════════════════════
 ;;; Bug 11: jira.org written every 5 min even if data unchanged
 ;;;
-;;; `workbench-org-sync-jira` (hooked to `workbench-jira-after-refresh-hook`)
+;;; `workbench-org/sync-jira` (hooked to `workbench-jira-after-refresh-hook`)
 ;;; always calls `workbench-org--write-jira-file` regardless of whether the
 ;;; tickets have changed since the last write. This means the file is rewritten
 ;;; every 5 minutes (the refresh interval) even when nothing changed.
@@ -183,14 +183,14 @@ Verifies the content-comparison guard skips redundant writes."
       (cl-letf (((symbol-function 'workbench-jira-cache-tickets)
                  (lambda () tickets)))
         ;; First sync — should write (file doesn't exist yet)
-        (workbench-org-sync-jira)
+        (workbench-org/sync-jira)
         (let* ((jira-file (workbench-org--jira-file))
                (mtime-1 (file-attribute-modification-time
                          (file-attributes jira-file))))
           ;; Small sleep to ensure mtime would differ if rewritten
           (sleep-for 0.1)
           ;; Second sync with SAME data — should NOT rewrite
-          (workbench-org-sync-jira)
+          (workbench-org/sync-jira)
           (let ((mtime-2 (file-attribute-modification-time
                           (file-attributes jira-file))))
             ;; FIX VERIFIED: file was NOT rewritten (mtime unchanged)
