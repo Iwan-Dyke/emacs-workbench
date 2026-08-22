@@ -188,6 +188,9 @@ Override in individual tests to simulate workspace state.")
   "Load a module from PATH relative to doom-user-dir."
   (load (expand-file-name path doom-user-dir) nil t))
 
+;; Load shared shell module — foundational dependency for all modules.
+(workbench-test-load-module "modules/tools/shell")
+
 ;;; ── Test Utilities ─────────────────────────────────────────────────────────
 
 (defmacro workbench-test-with-temp-file (var content &rest body)

@@ -20,13 +20,7 @@ Falls back to `workbench-jira-code-root' if nil.")
 
 ;;; ── Shell helper ───────────────────────────────────────────────────────────
 
-(defun workbench-repos--shell (dir &rest args)
-  "Run ARGS in DIR, return trimmed stdout or nil on failure."
-  (let ((default-directory (expand-file-name (or dir "~/"))))
-    (with-temp-buffer
-      (when (zerop (apply #'call-process (car args) nil t nil (cdr args)))
-        (let ((output (string-trim (buffer-string))))
-          (unless (string-empty-p output) output))))))
+(defalias 'workbench-repos--shell #'workbench-shell)
 
 ;;; ── Scanner ────────────────────────────────────────────────────────────────
 

@@ -47,30 +47,9 @@
 
 ;;; ── Shell Helpers ──────────────────────────────────────────────────────────
 
-(defun workbench-jira--shell (dir &rest args)
-  "Run ARGS in DIR, return trimmed stdout or nil."
-  (let ((default-directory (expand-file-name (or dir "~/"))))
-    (with-temp-buffer
-      (when (zerop (apply #'call-process (car args) nil t nil (cdr args)))
-        (string-trim (buffer-string))))))
-
-(defun workbench-jira--shell-lines (dir &rest args)
-  "Run ARGS in DIR, return non-empty lines."
-  (when-let ((out (apply #'workbench-jira--shell dir args)))
-    (and (not (string-empty-p out))
-         (split-string out "\n" t))))
-
-(defun workbench-jira--shell-or-error (dir &rest args)
-  "Run ARGS in DIR. Return (:ok OUTPUT) or (:error REASON)."
-  (let ((default-directory (expand-file-name (or dir "~/")))
-        (cmd (car args)))
-    (if (not (executable-find cmd))
-        (list :error (format "%s not found" cmd))
-      (with-temp-buffer
-        (let ((exit (apply #'call-process cmd nil t nil (cdr args))))
-          (if (zerop exit)
-              (list :ok (string-trim (buffer-string)))
-            (list :error (format "%s exited %d" cmd exit))))))))
+(defalias 'workbench-jira--shell #'workbench-shell)
+(defalias 'workbench-jira--shell-lines #'workbench-shell-lines)
+(defalias 'workbench-jira--shell-or-error #'workbench-shell-or-error)
 
 ;;; ── Error helpers ──────────────────────────────────────────────────────────
 

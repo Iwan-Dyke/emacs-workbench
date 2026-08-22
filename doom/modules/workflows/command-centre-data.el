@@ -24,18 +24,8 @@
 
 ;;; ── Shell Helpers (for non-Jira data: git, infra) ──────────────────────────
 
-(defun workbench-cc--shell (dir &rest args)
-  "Run ARGS in DIR, return trimmed stdout or nil."
-  (let ((default-directory (expand-file-name (or dir "~/"))))
-    (with-temp-buffer
-      (when (zerop (apply #'call-process (car args) nil t nil (cdr args)))
-        (string-trim (buffer-string))))))
-
-(defun workbench-cc--shell-lines (dir &rest args)
-  "Run ARGS in DIR, return non-empty lines."
-  (when-let ((out (apply #'workbench-cc--shell dir args)))
-    (and (not (string-empty-p out))
-         (split-string out "\n" t))))
+(defalias 'workbench-cc--shell #'workbench-shell)
+(defalias 'workbench-cc--shell-lines #'workbench-shell-lines)
 
 ;;; ── Jira (delegated to shared module) ──────────────────────────────────────
 

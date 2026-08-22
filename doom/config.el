@@ -3,6 +3,7 @@
 (load! "modules/system/core")
 (load! "modules/system/interface")
 (load! "modules/system/visual")
+(load! "modules/tools/shell")
 (load! "modules/tools/files")
 (load! "modules/tools/git")
 (load! "modules/tools/terminals")

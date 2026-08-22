@@ -7,18 +7,8 @@
 
 ;;; ── Shell Helpers ──────────────────────────────────────────────────────────
 
-(defun workbench--dashboard-shell (directory &rest args)
-  "Run ARGS as a process in DIRECTORY, return trimmed stdout or nil on failure."
-  (let ((default-directory directory))
-    (with-temp-buffer
-      (when (zerop (apply #'call-process (car args) nil t nil (cdr args)))
-        (string-trim (buffer-string))))))
-
-(defun workbench--dashboard-shell-lines (directory &rest args)
-  "Run ARGS in DIRECTORY, return stdout as a list of non-empty lines."
-  (when-let ((output (apply #'workbench--dashboard-shell directory args)))
-    (and (not (string-empty-p output))
-         (split-string output "\n" t))))
+(defalias 'workbench--dashboard-shell #'workbench-shell)
+(defalias 'workbench--dashboard-shell-lines #'workbench-shell-lines)
 
 (defun workbench--dashboard-git-p (directory)
   "Return non-nil if DIRECTORY is inside a git repository."
