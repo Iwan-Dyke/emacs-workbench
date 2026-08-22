@@ -209,31 +209,6 @@
              (lambda (_key) nil)))
     (should-not (workbench-jira--ticket-commented-today-p "TEST-1"))))
 
-;;; ── migrate-legacy-vars ────────────────────────────────────────────────────
-
-(ert-deftest jira/migrate-legacy-vars-copies-old-to-new ()
-  "Migration copies old workbench-cc--* values to workbench-jira-* when new var is at default."
-  (let ((workbench-jira-project nil)  ;; default
-        (workbench-cc--jira-project "MIGRATED"))
-    ;; Simulate the condition: old var is bound and set, new var is at default
-    (cl-letf (((symbol-function 'default-value) (lambda (_sym) nil)))
-      (workbench-jira--migrate-legacy-vars)
-      (should (equal workbench-jira-project "MIGRATED")))))
-
-(ert-deftest jira/migrate-legacy-vars-does-not-overwrite-existing ()
-  "Migration does NOT overwrite when new var differs from its defvar default.
-The guard (equal (symbol-value new) (default-value new)) is always t for
-non-buffer-local variables, so migration ALWAYS fires if the old var is set.
-This test documents that behaviour: when cc-- aliases are active, setting
-cc-- IS setting jira- (they're the same symbol), so migration is a no-op."
-  ;; With aliases active, setting the cc-- var IS setting the jira- var.
-  ;; The migration function's guard doesn't apply because they're aliased.
-  ;; This test confirms the alias makes the migration a conceptual no-op.
-  (let ((workbench-jira-project "ALREADY-SET"))
-    ;; workbench-cc--jira-project is aliased to workbench-jira-project,
-    ;; so reading it returns whatever jira-project is set to.
-    (should (equal workbench-cc--jira-project "ALREADY-SET"))))
-
 ;;; ── Sentinel error safety ──────────────────────────────────────────────────
 
 (ert-deftest jira/sentinel-kills-buffer-even-on-hook-error ()

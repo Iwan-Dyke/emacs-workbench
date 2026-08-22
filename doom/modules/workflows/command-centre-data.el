@@ -5,23 +5,6 @@
 
 (require 'seq)
 
-;;; ── Compatibility aliases ──────────────────────────────────────────────────
-;; The command centre SVG and team renderers reference these names.
-;; They now delegate to the shared Jira module.
-
-(defvaralias 'workbench-cc--jira-project 'workbench-jira-project)
-(defvaralias 'workbench-cc--jira-user 'workbench-jira-user)
-(defvaralias 'workbench-cc--git-author 'workbench-jira-git-author)
-(defvaralias 'workbench-cc--code-root 'workbench-jira-code-root)
-(defvaralias 'workbench-cc--spark-url 'workbench-jira-spark-url)
-(defvaralias 'workbench-cc--team-name 'workbench-jira-team-name)
-(defvaralias 'workbench-cc--team-id 'workbench-jira-team-id)
-(defvaralias 'workbench-cc--team-wip-limit 'workbench-jira-team-wip-limit)
-(defvaralias 'workbench-cc--team-members 'workbench-jira-team-members)
-(defvaralias 'workbench-cc--team-status-next 'workbench-jira-status-next)
-(defvaralias 'workbench-cc--team-status-wip 'workbench-jira-status-wip)
-(defvaralias 'workbench-cc--team-status-done 'workbench-jira-status-done)
-
 ;;; ── Shell Helpers (for non-Jira data: git, infra) ──────────────────────────
 
 (defalias 'workbench-cc--shell #'workbench-shell)
@@ -53,7 +36,7 @@
 
 (defun workbench-cc--recent-repos ()
   "Get repos you committed to recently, ordered by last commit date."
-  (let* ((dirs (directory-files (expand-file-name workbench-cc--code-root) t "^[^.]" t))
+  (let* ((dirs (directory-files (expand-file-name workbench-jira-code-root) t "^[^.]" t))
          (git-dirs (seq-filter (lambda (d)
                                  (file-directory-p (expand-file-name ".git" d)))
                                dirs))
@@ -61,7 +44,7 @@
                         (mapcar (lambda (d)
                                   (when-let ((date (workbench-cc--shell
                                                     d "git" "log" "-1"
-                                                    (concat "--author=" workbench-cc--git-author) "--format=%ct")))
+                                                    (concat "--author=" workbench-jira-git-author) "--format=%ct")))
                                     (cons d (string-to-number date))))
                                 git-dirs)))
          (sorted (sort with-commit (lambda (a b) (> (cdr a) (cdr b))))))
@@ -72,8 +55,8 @@
   (let ((branch (workbench-cc--shell dir "git" "branch" "--show-current"))
         (dirty (workbench-cc--shell-lines dir "git" "status" "--porcelain"))
         (ab (workbench-cc--shell dir "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
-        (last-commit (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-cc--git-author) "--format=%ar"))
-        (last-msg (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-cc--git-author) "--format=%s")))
+        (last-commit (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%ar"))
+        (last-msg (workbench-cc--shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%s")))
     (let (ahead behind)
       (when (and ab (string-match "\\([0-9]+\\)\t\\([0-9]+\\)" ab))
         (setq ahead (string-to-number (match-string 1 ab))
@@ -93,7 +76,7 @@
     (dolist (dir dirs)
       (when-let ((lines (workbench-cc--shell-lines
                          dir "git" "log" "-5"
-                         (concat "--author=" workbench-cc--git-author) "--since=3 days ago"
+                         (concat "--author=" workbench-jira-git-author) "--since=3 days ago"
                          "--format=%ct|%ar|%s")))
         (dolist (line lines)
           ;; Split on only the first two pipes — the message may contain pipes
@@ -119,7 +102,7 @@
                    (eq 0 (call-process "curl" nil nil nil
                                        "-s" "-o" "/dev/null"
                                        "-w" "" "--max-time" "1"
-                                       workbench-cc--spark-url))
+                                       workbench-jira-spark-url))
                  (error nil))))
 
 ;;; ── Jira Done / Next (delegated) ────────────────────────────────────────────
@@ -199,7 +182,7 @@ Returns items sorted by urgency: stale first, then no-recent-comment."
 Ticket fields may contain (:error REASON) instead of a list when fetch fails.
 Also fetches personal In Progress tickets (via :tickets) so the shared Jira
 cache can be populated for org agenda sync."
-  (let* ((wip-raw (workbench-cc--team-tickets-by-status workbench-cc--team-status-wip))
+  (let* ((wip-raw (workbench-cc--team-tickets-by-status workbench-jira-status-wip))
          (wip (if (workbench-cc--error-p wip-raw)
                   wip-raw
                 (mapcar (lambda (tkt)
@@ -209,8 +192,8 @@ cache can be populated for org agenda sync."
                                     (list :comment-author (plist-get comment :author)
                                           :comment-snippet (plist-get comment :snippet)))))
                         wip-raw)))
-         (next (workbench-cc--team-tickets-by-status workbench-cc--team-status-next))
-         (done-raw (workbench-cc--team-tickets-by-status workbench-cc--team-status-done))
+         (next (workbench-cc--team-tickets-by-status workbench-jira-status-next))
+         (done-raw (workbench-cc--team-tickets-by-status workbench-jira-status-done))
          (done (if (workbench-cc--error-p done-raw) done-raw (seq-take done-raw 5)))
          (attention (if (workbench-cc--error-p wip)
                         nil

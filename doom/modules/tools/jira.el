@@ -394,31 +394,4 @@ the result. Parses output in the sentinel callback."
 ;; Start the timer when Jira is configured
 (add-hook 'doom-init-ui-hook #'workbench-jira--maybe-start-timer)
 
-;; ── Backward compatibility ──────────────────────────────────────────────────
-;; Profile local.el may have set the old workbench-cc--* variable names before
-;; this module loaded. Migrate those values so the shared module picks them up.
-;; The defvaraliases in command-centre-data.el ensure future sets go through.
-
-(defun workbench-jira--migrate-legacy-vars ()
-  "Copy values from legacy workbench-cc--* vars if they were set before jira.el loaded."
-  (dolist (pair '((workbench-cc--jira-project . workbench-jira-project)
-                  (workbench-cc--jira-user . workbench-jira-user)
-                  (workbench-cc--git-author . workbench-jira-git-author)
-                  (workbench-cc--code-root . workbench-jira-code-root)
-                  (workbench-cc--spark-url . workbench-jira-spark-url)
-                  (workbench-cc--team-name . workbench-jira-team-name)
-                  (workbench-cc--team-id . workbench-jira-team-id)
-                  (workbench-cc--team-wip-limit . workbench-jira-team-wip-limit)
-                  (workbench-cc--team-members . workbench-jira-team-members)
-                  (workbench-cc--team-status-next . workbench-jira-status-next)
-                  (workbench-cc--team-status-wip . workbench-jira-status-wip)
-                  (workbench-cc--team-status-done . workbench-jira-status-done)))
-    (let ((old (car pair))
-          (new (cdr pair)))
-      (when (and (boundp old) (symbol-value old)
-                 (equal (symbol-value new) (default-value new)))
-        (set new (symbol-value old))))))
-
-(workbench-jira--migrate-legacy-vars)
-
 (provide 'workbench-jira)

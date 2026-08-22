@@ -6,8 +6,6 @@
 
 (defvar workbench-cc--buffer-name)
 (defvar workbench-cc--data)
-(defvar workbench-cc--team-wip-limit)
-(defvar workbench-cc--team-name)
 
 (declare-function workbench-cc--days-since-update "command-centre-data")
 (declare-function workbench-cc--error-p "command-centre-data")
@@ -80,8 +78,8 @@ from the cached ticket list instead."
          (next-error (workbench-cc--error-p next-tickets))
          (done-error (workbench-cc--error-p done-tickets))
          (wip-count (if wip-error 0 (length wip-tickets)))
-         (wip-limit workbench-cc--team-wip-limit)
-         (team-label (or workbench-cc--team-name "Team")))
+         (wip-limit workbench-jira-team-wip-limit)
+         (team-label (or workbench-jira-team-name "Team")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer)
