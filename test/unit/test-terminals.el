@@ -569,7 +569,7 @@ rather than landing on whichever window was focused when popup was opened."
         (primary-called nil))
     (puthash "test" (current-window-configuration) workbench--popup-terminal-configs)
     (cl-letf (((symbol-function 'workbench--popup-terminal-showing-p) (lambda () t))
-              ((symbol-function 'workbench--popup-terminal-primary-window)
+              ((symbol-function 'workbench-popup-primary-window)
                (lambda () (setq primary-called t) (selected-window))))
       (workbench/toggle-popup-terminal)
       ;; Should have called primary-window selection after restore
