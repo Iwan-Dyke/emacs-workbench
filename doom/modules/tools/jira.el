@@ -268,19 +268,10 @@ Accepts partial results — only stores keys that succeeded."
 
 (defun workbench-jira-refresh ()
   "Refresh the Jira cache asynchronously and run hooks when done.
-Spawns a child Emacs (batch) that runs the three fetch calls and prints
-the result. Parses output in the sentinel callback."
+Spawns a child Emacs (batch) via `workbench-async-eval' that runs the
+three fetch calls and returns the result as a plist."
   (interactive)
-  ;; Kill any in-flight fetch
-  (when (and workbench-jira--async-process
-             (process-live-p workbench-jira--async-process))
-    (delete-process workbench-jira--async-process))
-  (when (timerp workbench-jira--async-timeout)
-    (cancel-timer workbench-jira--async-timeout)
-    (setq workbench-jira--async-timeout nil))
-  (let* ((jira-file (expand-file-name
-                     "modules/tools/jira.el"
-                     doom-user-dir))
+  (let* ((jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
          (form `(progn
                   (setq workbench-jira-project ,workbench-jira-project
                         workbench-jira-user ,workbench-jira-user
@@ -298,67 +289,24 @@ the result. Parses output in the sentinel callback."
                   (let ((result (list :tickets (workbench-jira--fetch-tickets)
                                       :done (workbench-jira--fetch-done)
                                       :next (workbench-jira--fetch-next))))
-                    (prin1 result))))
-         (emacs-bin (expand-file-name invocation-name invocation-directory))
-         (output-buf (generate-new-buffer " *jira-async*"))
-         (proc (make-process
-                :name "jira-refresh"
-                :buffer output-buf
-                :command (list emacs-bin "--batch" "--eval" (prin1-to-string form))
-                :noquery t
-                :sentinel
-                (lambda (process _event)
-                  (when (memq (process-status process) '(exit signal))
-                    (when (timerp workbench-jira--async-timeout)
-                      (cancel-timer workbench-jira--async-timeout)
-                      (setq workbench-jira--async-timeout nil))
-                    (unwind-protect
-                        (condition-case err
-                            (let ((result nil))
-                              (if (zerop (process-exit-status process))
-                                  (when (buffer-live-p (process-buffer process))
-                                    (with-current-buffer (process-buffer process)
-                                      (goto-char (point-min))
-                                      (condition-case nil
-                                          (setq result (read (current-buffer)))
-                                        (error
-                                         (message "Jira refresh: failed to parse fetch result")))))
-                                (message "Jira refresh: process exited %d"
-                                         (process-exit-status process)))
-                              (when (eq workbench-jira--async-process process)
-                                (setq workbench-jira--async-process nil))
-                              (when result
-                                ;; Merge: only overwrite cache fields that succeeded.
-                                ;; Preserve existing good data for fields that errored.
-                                (let ((merged (list :tickets (if (workbench-jira-error-p (plist-get result :tickets))
-                                                                (plist-get workbench-jira--cache :tickets)
-                                                              (plist-get result :tickets))
-                                                    :done (if (workbench-jira-error-p (plist-get result :done))
-                                                              (plist-get workbench-jira--cache :done)
-                                                            (plist-get result :done))
-                                                    :next (if (workbench-jira-error-p (plist-get result :next))
-                                                              (plist-get workbench-jira--cache :next)
-                                                            (plist-get result :next)))))
-                                  (setq workbench-jira--cache merged))
-                                (setq workbench-jira--cache-time (current-time))
-                                (run-hooks 'workbench-jira-after-refresh-hook)))
-                          (error
-                           (message "Jira refresh: sentinel error: %s"
-                                    (error-message-string err))
-                           (when (eq workbench-jira--async-process process)
-                             (setq workbench-jira--async-process nil))))
-                      ;; Always kill the output buffer to prevent leaks.
-                      (when (buffer-live-p (process-buffer process))
-                        (kill-buffer (process-buffer process)))))))))
-    (setq workbench-jira--async-process proc)
-    ;; Timeout: kill after 60s if still running
-    (setq workbench-jira--async-timeout
-          (run-at-time 60 nil
-                       (lambda ()
-                         (when (and (process-live-p proc)
-                                    (eq workbench-jira--async-process proc))
-                           (message "Jira refresh: fetch timed out after 60s")
-                           (delete-process proc)))))))
+                    (prin1 result)))))
+    (workbench-async-eval
+     'jira form
+     (lambda (result)
+       (when result
+         (let ((merged (list :tickets (if (workbench-jira-error-p (plist-get result :tickets))
+                                         (plist-get workbench-jira--cache :tickets)
+                                       (plist-get result :tickets))
+                             :done (if (workbench-jira-error-p (plist-get result :done))
+                                       (plist-get workbench-jira--cache :done)
+                                     (plist-get result :done))
+                             :next (if (workbench-jira-error-p (plist-get result :next))
+                                       (plist-get workbench-jira--cache :next)
+                                     (plist-get result :next)))))
+           (setq workbench-jira--cache merged))
+         (setq workbench-jira--cache-time (current-time))
+         (run-hooks 'workbench-jira-after-refresh-hook)))
+     60 "Jira refresh")))
 
 (defun workbench-jira-ensure-cache ()
   "Ensure the cache is populated. Refreshes synchronously if stale or empty."

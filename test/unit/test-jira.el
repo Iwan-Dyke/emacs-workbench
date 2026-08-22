@@ -212,55 +212,37 @@
 ;;; ── Sentinel error safety ──────────────────────────────────────────────────
 
 (ert-deftest jira/sentinel-kills-buffer-even-on-hook-error ()
-  "The async sentinel kills the output buffer even if the after-refresh hook errors.
-Invokes the real sentinel function extracted from workbench-jira-refresh to
-verify the unwind-protect guarantees buffer cleanup."
-  (let* ((workbench-jira--cache nil)
-         (workbench-jira--cache-time nil)
-         (workbench-jira--async-process nil)
-         (workbench-jira--async-timeout nil)
-         (workbench-jira-project "TEST")
-         (workbench-jira-user "test@example.com")
-         (workbench-jira-after-refresh-hook
-          (list (lambda () (error "Hook error — simulated failure"))))
-         (captured-sentinel nil)
-         (output-buf nil)
-         (real-make-process (symbol-function 'make-process)))
-    ;; Intercept make-process to capture the sentinel and output buffer,
-    ;; but delegate to the real make-process for actual process creation.
+  "The async-eval sentinel kills the output buffer even when callback errors.
+Tests the shared async-eval infrastructure's unwind-protect guarantee."
+  (let* ((output-buf (generate-new-buffer " *test-async-sentinel*"))
+         (buf-name (buffer-name output-buf))
+         (real-make-process (symbol-function 'make-process))
+         (captured-proc nil))
+    (with-current-buffer output-buf
+      (insert "(:test t)"))
     (cl-letf (((symbol-function 'make-process)
                (lambda (&rest args)
-                 (setq captured-sentinel (plist-get args :sentinel))
-                 ;; Use a simple "true" command instead of emacs --batch
-                 (let* ((buf (plist-get args :buffer))
-                        (proc (funcall real-make-process
-                                       :name "test-jira-sentinel"
-                                       :buffer buf
-                                       :command '("true")
-                                       :noquery t)))
-                   (setq output-buf buf)
-                   (setq workbench-jira--async-process proc)
+                 (let ((proc (funcall real-make-process
+                                      :name "test-sentinel"
+                                      :buffer output-buf
+                                      :command '("true")
+                                      :noquery t
+                                      :sentinel (plist-get args :sentinel))))
+                   (setq captured-proc proc)
                    proc)))
-              ;; Prevent timeout timer from firing
               ((symbol-function 'run-at-time) (lambda (&rest _) nil)))
-      ;; Call the real workbench-jira-refresh which builds the sentinel
-      (workbench-jira-refresh))
-    ;; We now have the real sentinel and a buffer
-    (should captured-sentinel)
-    (should (buffer-live-p output-buf))
-    ;; Populate the output buffer with valid parseable data
-    (with-current-buffer output-buf
-      (erase-buffer)
-      (insert "(:tickets () :done () :next ())"))
+      (workbench-async-eval
+       'test-sentinel-cleanup
+       '(prin1 (:test t))
+       (lambda (_result)
+         (error "Callback error — should not prevent buffer cleanup"))))
     ;; Wait for the process to exit
-    (let ((proc workbench-jira--async-process))
-      (when (and proc (process-live-p proc))
-        (while (process-live-p proc)
-          (accept-process-output proc 0.1)))
-      ;; Invoke the REAL sentinel — run-hooks will error via our hook
-      (let ((buf-name (buffer-name output-buf)))
-        (funcall captured-sentinel proc "finished\n")
-        ;; Buffer must be dead — unwind-protect guarantees cleanup
-        (should-not (get-buffer buf-name))))))
+    (when (and captured-proc (process-live-p captured-proc))
+      (while (process-live-p captured-proc)
+        (accept-process-output captured-proc 0.1)))
+    ;; Allow sentinel to run
+    (accept-process-output nil 0.5)
+    ;; Buffer must be dead — unwind-protect guarantees cleanup
+    (should-not (get-buffer buf-name))))
 
 ;;; test-jira.el ends here

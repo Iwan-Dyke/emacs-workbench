@@ -25,29 +25,15 @@
 
 (defun workbench-cc--async-collect (callback)
   "Run data collection asynchronously, calling CALLBACK with the result plist.
-Spawns a child Emacs that loads the data module and runs the appropriate
-collect function. CALLBACK receives the parsed plist on success, or nil on
-failure. Kills the child process after 60 seconds if it hangs."
-  ;; Kill any in-flight fetch
-  (when (and workbench-cc--async-process
-             (process-live-p workbench-cc--async-process))
-    (delete-process workbench-cc--async-process))
-  (when (timerp workbench-cc--async-timeout)
-    (cancel-timer workbench-cc--async-timeout)
-    (setq workbench-cc--async-timeout nil))
-  (let* ((jira-file (expand-file-name
-                     "modules/tools/jira.el"
-                     doom-user-dir))
-         (data-file (expand-file-name
-                     "modules/workflows/command-centre-data.el"
-                     doom-user-dir))
+Spawns a child Emacs via `workbench-async-eval' that loads the data module
+and runs the appropriate collect function. CALLBACK receives the parsed
+plist on success, or nil on failure."
+  (let* ((jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
+         (data-file (expand-file-name "modules/workflows/command-centre-data.el"
+                                      doom-user-dir))
          (view workbench/command-centre-view)
-         ;; Build an elisp form that loads the jira + data modules with all
-         ;; config, runs the collection, and prints the result as a sexp.
          (form `(progn
-                  ;; seq is needed by jira.el and command-centre-data.el
                   (require 'seq)
-                  ;; Set config variables before loading
                   (setq workbench-jira-project ,workbench-jira-project
                         workbench-jira-user ,workbench-jira-user
                         workbench-jira-git-author ,workbench-jira-git-author
@@ -65,46 +51,8 @@ failure. Kills the child process after 60 seconds if it hangs."
                   (let ((result ,(pcase view
                                    ('team-lead '(workbench-cc--collect-team-lead))
                                    (_ '(workbench-cc--collect-all)))))
-                    (prin1 result))))
-         (emacs-bin (expand-file-name invocation-name invocation-directory))
-         (output-buf (generate-new-buffer " *cc-async*"))
-         (proc (make-process
-                :name "command-centre-fetch"
-                :buffer output-buf
-                :command (list emacs-bin "--batch" "--eval" (prin1-to-string form))
-                :noquery t
-                :sentinel
-                (lambda (process _event)
-                  (when (memq (process-status process) '(exit signal))
-                    ;; Cancel the timeout timer — process finished.
-                    (when (timerp workbench-cc--async-timeout)
-                      (cancel-timer workbench-cc--async-timeout)
-                      (setq workbench-cc--async-timeout nil))
-                    (let ((result nil))
-                      (if (zerop (process-exit-status process))
-                          (when (buffer-live-p (process-buffer process))
-                            (with-current-buffer (process-buffer process)
-                              (goto-char (point-min))
-                              (condition-case nil
-                                  (setq result (read (current-buffer)))
-                                (error
-                                 (message "Command centre: failed to parse fetch result")))))
-                        (message "Command centre: fetch process exited %d"
-                                 (process-exit-status process)))
-                      (when (buffer-live-p (process-buffer process))
-                        (kill-buffer (process-buffer process)))
-                      (when (eq workbench-cc--async-process process)
-                        (setq workbench-cc--async-process nil))
-                      (funcall callback result)))))))
-    (setq workbench-cc--async-process proc)
-    ;; Timeout: kill after 60s if still running
-    (setq workbench-cc--async-timeout
-          (run-at-time 60 nil
-                       (lambda ()
-                         (when (and (process-live-p proc)
-                                    (eq workbench-cc--async-process proc))
-                           (message "Command centre: fetch timed out after 60s")
-                           (delete-process proc)))))))
+                    (prin1 result)))))
+    (workbench-async-eval 'cc form callback 60 "Command centre")))
 
 (defvar workbench-cc--fetch-failure-count 0
   "Count of consecutive CC fetch failures. Used to re-enable Jira timer fallback.")
