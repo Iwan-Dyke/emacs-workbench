@@ -217,3 +217,5 @@ correct root explicitly after the workspace switch completes."
   (require 'treemacs-evil)
   (treemacs-follow-mode +1)
   (treemacs-git-mode 'deferred))
+
+(provide 'workbench-files)

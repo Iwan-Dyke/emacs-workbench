@@ -28,3 +28,5 @@
   ;; Prefer xwidget-webkit for in-Emacs rendering when available
   (when (featurep 'xwidget-internal)
     (setq markdown-browse-url-func #'xwidget-webkit-browse-url)))
+
+(provide 'workbench-languages)

@@ -72,3 +72,5 @@ On dismiss, selects the primary editing window."
 
 (add-hook 'persp-activated-functions #'workbench--popup-magit-clear-stale)
 (add-hook 'delete-frame-functions #'workbench--popup-magit-clear-frame)
+
+(provide 'workbench-git)
