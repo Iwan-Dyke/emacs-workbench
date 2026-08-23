@@ -21,6 +21,8 @@ appends a numeric suffix (e.g. utils<2>)."
         (while (progn
                  (setq candidate (format "%s<%d>" base n))
                  (+workspace-exists-p candidate))
+          (when (> n 100)
+            (error "Too many workspace name collisions for %s" base))
           (setq n (1+ n)))
         candidate))))
 
