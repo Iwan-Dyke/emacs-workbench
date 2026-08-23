@@ -105,5 +105,15 @@ Call from `delete-frame-functions'."
       (remhash ws configs)
       (remhash ws buffers))))
 
+;;; ── Icon Helper ─────────────────────────────────────────────────────────────
+
+(defun workbench-icon (fn name &optional face)
+  "Call nerd-icons FN with NAME, applying FACE. Returns empty string if unavailable.
+FACE is applied via `propertize' after the icon is generated."
+  (if (fboundp fn)
+      (let ((icon (funcall fn name)))
+        (if face (propertize icon 'face face) icon))
+    ""))
+
 (provide 'workbench-popup)
 ;;; tools/popup.el ends here
