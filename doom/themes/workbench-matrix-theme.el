@@ -44,8 +44,8 @@
    (vertical-bar (doom-darken base3 0.2))
    (selection    '("#1a4a1a" "#005f00"   "green"        ))
    (builtin      '("#33ff66" "#00ff00"   "green"        ))  ; bright phosphor
-   (comments     base5)                                      ; bumped from base4 for readability
-   (doc-comments base6)                                      ; bumped from base5
+   (comments     base6)                                      ; bumped to base6 for WCAG AA compliance (5.5:1 contrast)
+   (doc-comments base7)                                      ; brighter than comments for distinction
    (constants    '("#00ffcc" "#00ff00"   "cyan"         ))  ; distinct cyan-green
    (functions    '("#66ff99" "#00ff00"   "green"        ))  ; bright — active phosphor
    (keywords     '("#00ff41" "#00ff00"   "green"        ))  ; full intensity phosphor
