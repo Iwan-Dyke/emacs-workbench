@@ -50,7 +50,7 @@ registered directory, then falls back to `workbench-jira-code-root'."
       (or (and (boundp 'workbench--workspace-directories)
                (hash-table-p workbench--workspace-directories)
                (gethash (+workspace-current-name) workbench--workspace-directories))
-          (expand-file-name (bound-and-true-p workbench-code-root))))))
+          (expand-file-name (or (bound-and-true-p workbench-code-root) "~/code/"))))))
 
 (defun workbench--popup-terminal-buffer ()
   "Return the popup terminal vterm buffer for the current workspace.
@@ -126,3 +126,5 @@ was focused when the popup was opened."
 
 (add-hook 'persp-activated-functions #'workbench--popup-terminal-clear-stale)
 (add-hook 'delete-frame-functions #'workbench--popup-terminal-clear-frame)
+
+(provide 'workbench-terminals)
