@@ -72,7 +72,11 @@ When TICKETS is an error plist, refuses to write to avoid wiping valid content."
       (unless (equal content existing)
         (make-directory dir t)
         (with-temp-file file
-          (insert content))))))
+          (insert content))
+        ;; Revert any buffer visiting this file so it stays in sync
+        (when-let ((buf (find-buffer-visiting file)))
+          (with-current-buffer buf
+            (revert-buffer t t t)))))))
 
 (defun workbench-org/sync-jira ()
   "Sync In Progress tickets from the shared Jira cache to jira.org.
@@ -92,13 +96,13 @@ When called from the refresh hook, the cache is already fresh."
 ;; The stale view needs a custom skip function that checks UPDATED property.
 ;; This is a simple approach — if the UPDATED value is within 14 days, skip it.
 (defun workbench-org--stale-skip ()
-  "Skip entry if UPDATED property is within 14 days or missing.
+  "Skip entry if UPDATED property is within `workbench-jira-stale-days' or missing.
 Entries with unparseable dates (e.g. relative strings from jira-cli) are NOT
 skipped — they appear in the stale view so the user can investigate."
   (let ((updated (org-entry-get nil "UPDATED")))
     (if updated
         (let ((days (workbench-jira-days-since-update updated)))
-          (if (and days (< days 14))
+          (if (and days (< days workbench-jira-stale-days))
               (org-end-of-subtree t)  ; skip: recently updated
             nil))  ; don't skip: genuinely stale OR unparseable (show both)
       (org-end-of-subtree t))))
@@ -136,16 +140,16 @@ skipped — they appear in the stale view so the user can investigate."
 
 (after! org
   (setq org-capture-templates
-        '(("n" "Note" entry
-           (file+headline "~/org/notes/notes.org" "Notes")
+        `(("n" "Note" entry
+           (file+headline ,(expand-file-name "notes/notes.org" org-directory) "Notes")
            "* %?\n:PROPERTIES:\n:ID: %(org-id-new)\n:TYPE: Note\n:CREATED: %U\n:END:\n\n"
            :empty-lines 1)
           ("d" "Decision" entry
-           (file+headline "~/org/projects/decisions.org" "Decisions")
+           (file+headline ,(expand-file-name "projects/decisions.org" org-directory) "Decisions")
            "* %?\n:PROPERTIES:\n:ID: %(org-id-new)\n:TYPE: Decision\n:CREATED: %U\n:END:\n\n** Context\n\n** Decision\n\n** Consequences\n\n"
            :empty-lines 1)
           ("m" "Meeting" entry
-           (file+headline "~/org/notes/meetings.org" "Meetings")
+           (file+headline ,(expand-file-name "notes/meetings.org" org-directory) "Meetings")
            "* %? :meeting:\n:PROPERTIES:\n:ID: %(org-id-new)\n:TYPE: Note\n:CREATED: %U\n:END:\n\n** Attendees\n\n** Discussion\n\n** Actions\n\n"
            :empty-lines 1))))
 

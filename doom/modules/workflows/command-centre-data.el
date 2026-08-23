@@ -146,7 +146,8 @@ Jira fields may contain (:error REASON) instead of a list when fetch fails."
 (defun workbench-cc--team-attention-items (tickets)
   "Compute attention items from TICKETS (In Progress list).
 Returns items sorted by urgency: stale first, then no-recent-comment."
-  (let ((items nil))
+  (let ((items nil)
+        (stale workbench-jira-stale-days))
     (dolist (tkt tickets)
       (let* ((days (workbench-jira-days-since-update (plist-get tkt :updated)))
              (key (plist-get tkt :key))
@@ -155,12 +156,12 @@ Returns items sorted by urgency: stale first, then no-recent-comment."
          ;; Nil days means unparseable date (e.g. "2 hours ago") — recently
          ;; updated, so skip without flagging.
          ((null days) nil)
-         ((> days 14)
+         ((> days stale)
           (push (list :key key :assignee assignee :days days
                       :reason "two-week rule") items))
-         ((> days 7)
+         ((> days (/ stale 2))
           (push (list :key key :assignee assignee :days days
-                      :reason "no update 7+ days") items))
+                      :reason (format "no update %d+ days" (/ stale 2))) items))
          ((> days 3)
           (push (list :key key :assignee assignee :days days
                       :reason "may need check-in") items)))))

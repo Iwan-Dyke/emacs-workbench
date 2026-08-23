@@ -38,6 +38,11 @@
           (propertize (format "Fetch failed: %s" reason) 'face 'error)
           "\n"))
 
+(defun workbench-cc--valid-ticket-key-p (key)
+  "Return non-nil if KEY matches the Jira ticket key format (e.g. DPT-42)."
+  (and (stringp key)
+       (string-match-p "\\`[A-Z][A-Z0-9]+-[0-9]+\\'" key)))
+
 (defun workbench-cc--open-ticket-at-point ()
   "Open the Jira ticket at point in a browser.
 In team-lead (text) view, reads the ticket key from text properties.
@@ -46,6 +51,8 @@ from the cached ticket list instead."
   (interactive)
   (if-let ((key (get-text-property (point) 'workbench-cc-ticket-key)))
       (progn
+        (unless (workbench-cc--valid-ticket-key-p key)
+          (user-error "Invalid ticket key format: %s" key))
         (start-process "jira-open" nil "jira" "open" key)
         (message "Opening %s..." key))
     ;; No text property (IC/SVG view) — offer ticket selection from cached data
@@ -60,6 +67,8 @@ from the cached ticket list instead."
                                 tickets))
                (selection (completing-read "Open ticket: " choices nil t))
                (selected-key (car (split-string selection " " t))))
+          (unless (workbench-cc--valid-ticket-key-p selected-key)
+            (user-error "Invalid ticket key format: %s" selected-key))
           (start-process "jira-open" nil "jira" "open" selected-key)
           (message "Opening %s..." selected-key))
       (user-error "No tickets available. Refresh with R"))))
@@ -142,7 +151,7 @@ from the cached ticket list instead."
                    (days (workbench-jira-days-since-update (plist-get tkt :updated)))
                    (comment (plist-get tkt :comment-snippet))
                    (stale (and days (> days 3)))
-                   (very-stale (and days (> days 7)))
+                   (very-stale (and days (> days (/ workbench-jira-stale-days 2))))
                    (status-face (cond (very-stale 'error) (stale 'warning) (t 'success))))
               ;; Line 1: status pip + key + summary
               (insert "  "
@@ -267,9 +276,10 @@ from the cached ticket list instead."
                     "\n")
           (dolist (item attention)
             (let* ((days (plist-get item :days))
-                   (face (cond ((> days 14) 'error) ((> days 7) 'warning) (t 'shadow)))
-                   (icon (cond ((> days 14) (workbench-cc--icon 'nerd-icons-mdicon "nf-md-fire" 'error))
-                               ((> days 7) (workbench-cc--icon 'nerd-icons-mdicon "nf-md-alert" 'warning))
+                   (stale workbench-jira-stale-days)
+                   (face (cond ((> days stale) 'error) ((> days (/ stale 2)) 'warning) (t 'shadow)))
+                   (icon (cond ((> days stale) (workbench-cc--icon 'nerd-icons-mdicon "nf-md-fire" 'error))
+                               ((> days (/ stale 2)) (workbench-cc--icon 'nerd-icons-mdicon "nf-md-alert" 'warning))
                                (t (workbench-cc--icon 'nerd-icons-mdicon "nf-md-eye" 'shadow)))))
               (insert "  "
                       icon

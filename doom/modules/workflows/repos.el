@@ -312,13 +312,32 @@
     (workbench-repos--render (workbench-repos--filtered-view))))
 
 (defun workbench-repos-refresh ()
-  "Rescan and refresh all repo statuses."
+  "Rescan and refresh all repo statuses asynchronously.
+Spawns a child Emacs to do the scanning so the UI is not blocked."
   (interactive)
   (message "Repos: scanning...")
-  (let ((paths (workbench-repos--scan-roots (workbench-repos--roots))))
-    (setq workbench-repos--statuses (workbench-repos--get-all-statuses paths))
-    (workbench-repos--redraw)
-    (message "Repos: %d repos found" (length workbench-repos--statuses))))
+  (let* ((shell-file (expand-file-name "modules/tools/shell.el" doom-user-dir))
+         (data-file (expand-file-name "modules/workflows/repos-data.el" doom-user-dir))
+         (roots (workbench-repos--roots))
+         (form `(progn
+                  (require 'seq)
+                  (require 'cl-lib)
+                  (load ,shell-file nil t)
+                  (setq workbench-repos-roots ',roots)
+                  (load ,data-file nil t)
+                  (let* ((paths (workbench-repos--scan-roots ',roots))
+                         (statuses (workbench-repos--get-all-statuses paths)))
+                    (prin1 statuses)))))
+    (workbench-async-eval
+     'repos form
+     (lambda (result)
+       (if result
+           (progn
+             (setq workbench-repos--statuses result)
+             (workbench-repos--redraw)
+             (message "Repos: %d repos found" (length result)))
+         (message "Repos: scan failed")))
+     30 "Repos scan")))
 
 (defun workbench-repos-cycle-filter ()
   "Cycle to the next filter."
@@ -369,21 +388,47 @@
         (workbench/toggle-popup-magit))
     (user-error "No repo at point")))
 
+(defvar workbench-repos--fetch-in-progress nil
+  "Non-nil when an async fetch-all operation is running.")
+
 (defun workbench-repos-fetch-all ()
-  "Fetch all repos in background."
+  "Fetch all repos asynchronously in parallel."
   (interactive)
-  (message "Repos: fetching remotes...")
-  (let ((count 0) (failed 0))
-    (dolist (repo workbench-repos--statuses)
-      (if (workbench-repos--fetch (plist-get repo :path))
-          (cl-incf count)
-        (cl-incf failed)))
-    ;; Re-read statuses after fetch
-    (let ((paths (mapcar (lambda (r) (plist-get r :path)) workbench-repos--statuses)))
-      (setq workbench-repos--statuses (workbench-repos--get-all-statuses paths)))
-    (workbench-repos--redraw)
-    (message "Repos: fetched %d%s"
-             count (if (> failed 0) (format " (%d failed)" failed) ""))))
+  (when workbench-repos--fetch-in-progress
+    (user-error "Fetch already in progress"))
+  (let* ((repos workbench-repos--statuses)
+         (total (length repos))
+         (finished 0)
+         (succeeded 0)
+         (failed 0))
+    (if (zerop total)
+        (message "Repos: nothing to fetch")
+      (setq workbench-repos--fetch-in-progress t)
+      (message "Repos: fetching %d remotes..." total)
+      (dolist (repo repos)
+        (let ((path (plist-get repo :path))
+              (name (plist-get repo :name)))
+          (make-process
+           :name (format "repos-fetch-%s" name)
+           :command (list "git" "-C" path "fetch" "--quiet")
+           :noquery t
+           :sentinel
+           (lambda (_proc event)
+             (let ((ok (string-prefix-p "finished" event)))
+               (if ok (cl-incf succeeded) (cl-incf failed))
+               (cl-incf finished)
+               (when (= finished total)
+                 ;; All fetches done — refresh statuses and redraw
+                 (setq workbench-repos--fetch-in-progress nil)
+                 (let ((paths (mapcar (lambda (r) (plist-get r :path))
+                                      workbench-repos--statuses)))
+                   (setq workbench-repos--statuses
+                         (workbench-repos--get-all-statuses paths)))
+                 (workbench-repos--redraw)
+                 (message "Repos: fetched %d%s"
+                          succeeded
+                          (if (> failed 0)
+                              (format " (%d failed)" failed) "")))))))))))
 
 (defun workbench-repos-pull-selected ()
   "Pull the repo at point (only if clean and behind)."
