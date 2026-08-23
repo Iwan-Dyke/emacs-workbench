@@ -9,6 +9,9 @@
 
 ;;; ── Icons ──────────────────────────────────────────────────────────────────
 
+;; NOTE: Unlike `workbench-icon' (shared, in popup.el) which applies face via
+;; propertize, this passes extra ARGS (including :face) directly to nerd-icons.
+;; Cannot defalias to workbench-icon due to different face-application strategy.
 (defun workbench--dashboard-icon (fn name &rest args)
   "Call nerd-icons FN with NAME and ARGS, returning empty string if unavailable."
   (if (fboundp fn)
@@ -300,7 +303,9 @@
                         (let ((enable-local-variables nil)
                               (enable-local-eval nil))
                           (if (string-suffix-p ".org" readme)
-                              (org-mode)
+                              (progn
+                                (org-mode)
+                                (font-lock-ensure))
                             (when (fboundp 'markdown-mode)
                               (markdown-mode)
                               (font-lock-ensure))))
