@@ -192,7 +192,7 @@
 
 (ert-deftest jira/ticket-commented-today-p-returns-t-for-today ()
   "Returns t when the last comment date matches today."
-  (let ((today (format-time-string "%d %b %Y")))
+  (let ((today (format-time-string "%d %B %Y")))
     (cl-letf (((symbol-function 'workbench-jira--ticket-last-comment-date)
                (lambda (_key) (format "Monday, %s" today))))
       (should (workbench-jira--ticket-commented-today-p "TEST-1")))))

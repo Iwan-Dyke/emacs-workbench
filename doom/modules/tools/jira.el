@@ -161,7 +161,7 @@ Returns a list of plists or nil for empty output."
 (defun workbench-jira--ticket-commented-today-p (key)
   "Return t if KEY has a comment from today."
   (when-let ((date-str (workbench-jira--ticket-last-comment-date key)))
-    (let ((today (format-time-string "%d %b %Y")))
+    (let ((today (format-time-string "%d %B %Y")))
       (string-match-p (regexp-quote today) date-str))))
 
 (defun workbench-jira--team-ticket-last-comment (key)
@@ -252,6 +252,21 @@ Accepts partial results — only stores keys that succeeded."
       (setq workbench-jira--cache-time (current-time))
       (run-hooks 'workbench-jira-after-refresh-hook))))
 
+(defun workbench-jira--config-form ()
+  "Return a form that sets all Jira config variables in a child Emacs."
+  `(setq workbench-jira-project ,workbench-jira-project
+         workbench-jira-user ,workbench-jira-user
+         workbench-jira-git-author ,workbench-jira-git-author
+         workbench-jira-code-root ,workbench-jira-code-root
+         workbench-jira-spark-url ,workbench-jira-spark-url
+         workbench-jira-team-name ,workbench-jira-team-name
+         workbench-jira-team-id ,workbench-jira-team-id
+         workbench-jira-team-wip-limit ,workbench-jira-team-wip-limit
+         workbench-jira-team-members ',workbench-jira-team-members
+         workbench-jira-status-next ,workbench-jira-status-next
+         workbench-jira-status-wip ,workbench-jira-status-wip
+         workbench-jira-status-done ,workbench-jira-status-done))
+
 (defun workbench-jira-refresh ()
   "Refresh the Jira cache asynchronously and run hooks when done.
 Spawns a child Emacs (batch) via `workbench-async-eval' that runs the
@@ -261,18 +276,7 @@ three fetch calls and returns the result as a plist."
          (jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
          (form `(progn
                   (load ,shell-file nil t)
-                  (setq workbench-jira-project ,workbench-jira-project
-                        workbench-jira-user ,workbench-jira-user
-                        workbench-jira-git-author ,workbench-jira-git-author
-                        workbench-jira-code-root ,workbench-jira-code-root
-                        workbench-jira-spark-url ,workbench-jira-spark-url
-                        workbench-jira-team-name ,workbench-jira-team-name
-                        workbench-jira-team-id ,workbench-jira-team-id
-                        workbench-jira-team-wip-limit ,workbench-jira-team-wip-limit
-                        workbench-jira-team-members ',workbench-jira-team-members
-                        workbench-jira-status-next ,workbench-jira-status-next
-                        workbench-jira-status-wip ,workbench-jira-status-wip
-                        workbench-jira-status-done ,workbench-jira-status-done)
+                  ,(workbench-jira--config-form)
                   (load ,jira-file nil t)
                   (let ((result (list :tickets (workbench-jira--fetch-tickets)
                                       :done (workbench-jira--fetch-done)
