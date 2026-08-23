@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
+. "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
+
 platform="${WORKBENCH_PLATFORM_OVERRIDE:-$(uname -s)}"
 status=0
 
@@ -28,42 +30,6 @@ apt_core_packages=(
     python3-pip
     python3-venv
 )
-
-fail() {
-    printf "fail %s\n" "$1"
-    status=1
-}
-
-warn() {
-    printf "warn %s\n" "$1"
-}
-
-run() {
-    local description="$1"
-    local arg
-
-    shift
-    printf "+ %s" "$description"
-    for arg in "$@"; do
-        printf " %s" "$arg"
-    done
-    printf "\n"
-
-    "$@"
-}
-
-must_run() {
-    if run "$@"; then
-        return 0
-    fi
-
-    fail "$1 failed"
-    return 1
-}
-
-have_command() {
-    command -v "$1" >/dev/null 2>&1
-}
 
 sudo_prefix() {
     if [ "$(id -u)" -eq 0 ]; then

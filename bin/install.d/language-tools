@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
+. "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
+
 platform="${WORKBENCH_PLATFORM_OVERRIDE:-$(uname -s)}"
 user_bin="$HOME/.local/bin"
 
@@ -56,41 +58,6 @@ go_language_commands=(
 pipx_language_packages=(
     ruff
 )
-
-warn() {
-    printf "warn %s\n" "$1"
-}
-
-ok() {
-    printf "ok  %s\n" "$1"
-}
-
-run() {
-    local description="$1"
-    local arg
-
-    shift
-    printf "+ %s" "$description"
-    for arg in "$@"; do
-        printf " %s" "$arg"
-    done
-    printf "\n"
-
-    "$@"
-}
-
-try_run() {
-    if run "$@"; then
-        return 0
-    fi
-
-    warn "$1 failed"
-    return 0
-}
-
-have_command() {
-    command -v "$1" >/dev/null 2>&1
-}
 
 sudo_prefix() {
     if [ "$(id -u)" -eq 0 ]; then
