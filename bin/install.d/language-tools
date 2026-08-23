@@ -2,7 +2,6 @@
 set -u
 
 platform="${WORKBENCH_PLATFORM_OVERRIDE:-$(uname -s)}"
-status=0
 user_bin="$HOME/.local/bin"
 
 brew_language_packages=(
@@ -138,7 +137,14 @@ install_npm_language_tools() {
         return
     fi
 
-    try_run "install npm language servers" npm install -g "${npm_language_packages[@]}"
+    if [ "$platform" = "Darwin" ]; then
+        # macOS: Homebrew node handles global install permissions correctly
+        try_run "install npm language servers" npm install -g "${npm_language_packages[@]}"
+    else
+        # Linux: install to user-local prefix to avoid requiring root
+        mkdir -p "$user_bin"
+        try_run "install npm language servers" npm install -g --prefix "$HOME/.local" "${npm_language_packages[@]}"
+    fi
 }
 
 install_go_language_tools() {
@@ -233,4 +239,4 @@ Linux)
     ;;
 esac
 
-exit "$status"
+exit 0
