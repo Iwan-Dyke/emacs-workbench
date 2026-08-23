@@ -16,12 +16,17 @@
       (workbench/resize-mode)
       (should (eq called workbench-resize-map)))))
 
-(ert-deftest interface/resize-exit-clears-map ()
-  "Exiting resize mode displays a message (transient map self-dismisses)."
-  (let ((msg nil))
-    (cl-letf (((symbol-function 'message) (lambda (fmt &rest _) (setq msg fmt))))
-      (workbench--resize-exit)
-      (should (string= msg "Resize done")))))
+(ert-deftest interface/resize-exit-via-on-exit-callback ()
+  "The on-exit callback in set-transient-map prints 'Resize done'."
+  (let ((on-exit nil))
+    (cl-letf (((symbol-function 'set-transient-map)
+               (lambda (_map _keep-p exit-fn) (setq on-exit exit-fn))))
+      (workbench/resize-mode)
+      (should (functionp on-exit))
+      (let ((msg nil))
+        (cl-letf (((symbol-function 'message) (lambda (fmt &rest _) (setq msg fmt))))
+          (funcall on-exit)
+          (should (string= msg "Resize done")))))))
 
 (ert-deftest interface/resize-map-has-h-l-j-k ()
   "Resize map binds h, l, j, k."
@@ -30,10 +35,10 @@
   (should (eq (lookup-key workbench-resize-map "j") #'workbench/resize-down))
   (should (eq (lookup-key workbench-resize-map "k") #'workbench/resize-up)))
 
-(ert-deftest interface/resize-map-has-default-exit ()
-  "Resize map has C-g and escape bindings for explicit exit."
-  (should (eq (lookup-key workbench-resize-map (kbd "C-g")) #'workbench--resize-exit))
-  (should (eq (lookup-key workbench-resize-map [escape]) #'workbench--resize-exit)))
+(ert-deftest interface/resize-map-no-exit-bindings ()
+  "Resize map does NOT bind C-g or escape (they exit via transient-map deactivation)."
+  (should-not (lookup-key workbench-resize-map (kbd "C-g")))
+  (should-not (lookup-key workbench-resize-map [escape])))
 
 (ert-deftest interface/resize-map-has-balance ()
   "Resize map has = for balance-windows."

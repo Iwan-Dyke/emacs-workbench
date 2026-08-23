@@ -129,16 +129,10 @@ From the Treemacs tree, return to the editing window."
     (define-key map "j" #'workbench/resize-down)
     (define-key map "k" #'workbench/resize-up)
     (define-key map "=" (lambda () (interactive) (balance-windows) (workbench--resize-message)))
-    (define-key map (kbd "C-g") #'workbench--resize-exit)
-    (define-key map [escape] #'workbench--resize-exit)
     map)
   "Transient keymap for repeatable window resizing.
-Any key not bound here exits resize mode and is re-dispatched normally.")
-
-(defun workbench--resize-exit ()
-  "Exit resize mode."
-  (interactive)
-  (message "Resize done"))
+Any key not bound here (including C-g/Escape) exits resize mode automatically
+via `set-transient-map' deactivation and is re-dispatched normally.")
 
 (defun workbench--resize-keep-p ()
   "Return non-nil if the last key should keep resize mode active."
