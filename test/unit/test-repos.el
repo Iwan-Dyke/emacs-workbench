@@ -6,6 +6,7 @@
 ;; Load test helper and source
 (require 'test-helper)
 (workbench-test-load-module "modules/workflows/repos-data.el")
+(workbench-test-load-module "modules/workflows/repos.el")
 
 ;;; ── Scanner ────────────────────────────────────────────────────────────────
 

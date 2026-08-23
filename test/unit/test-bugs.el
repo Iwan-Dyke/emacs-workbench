@@ -40,8 +40,7 @@
                          (when (get-buffer-window workbench-cc--buffer-name)
                            (workbench-cc--render workbench-cc--data)))))))
 
-;; Add it to the hook exactly as command-centre.el does
-(add-hook 'window-size-change-functions #'workbench-cc--on-resize)
+;; NOTE: the hook is added per-test (not globally) to avoid polluting other tests.
 
 ;; Stub for coding tests
 (unless (fboundp 'workbench/open-project-dashboard)
@@ -278,34 +277,38 @@ resizes — not just when the CC window's size changes. This wastes SVG redraws.
   "FIXED: workbench-cc--on-resize now debounces with a 0.3s timer.
 Rapid resize events no longer trigger repeated expensive SVG re-renders.
 Only the last event in a burst fires the actual render."
-  ;; The function is still in window-size-change-functions
-  (should (memq 'workbench-cc--on-resize window-size-change-functions))
-  ;; Verify the function NOW has internal debounce:
-  ;; calling twice in rapid succession only schedules ONE render
-  (let ((workbench-cc--data '(:tickets () :repos () :commits () :infra () :time "now"))
-        (workbench/command-centre-view 'ic)
-        (workbench-cc--resize-timer nil)
-        (render-count 0))
-    (let ((cc-buf (get-buffer-create "*command-centre*")))
-      (unwind-protect
-          (cl-letf (((symbol-function 'get-buffer-window)
-                     (lambda (_name &rest _) (selected-window)))
-                    ((symbol-function 'workbench-cc--render)
-                     (lambda (_data) (cl-incf render-count))))
-            ;; Call twice in rapid succession — debounce means only 1 timer
-            (workbench-cc--on-resize nil)
-            (workbench-cc--on-resize nil)
-            ;; Only one timer scheduled (second cancelled the first)
-            (should (timerp workbench-cc--resize-timer))
-            ;; No render has fired yet (waiting for timer)
-            (should (= render-count 0))
-            ;; Fire the timer — only ONE render
-            (funcall (timer--function workbench-cc--resize-timer))
-            (should (= render-count 1)))
-        (when (timerp workbench-cc--resize-timer)
-          (cancel-timer workbench-cc--resize-timer)
-          (setq workbench-cc--resize-timer nil))
-        (kill-buffer cc-buf)))))
+  (unwind-protect
+      (progn
+        (add-hook 'window-size-change-functions #'workbench-cc--on-resize)
+        ;; The function is still in window-size-change-functions
+        (should (memq 'workbench-cc--on-resize window-size-change-functions))
+        ;; Verify the function NOW has internal debounce:
+        ;; calling twice in rapid succession only schedules ONE render
+        (let ((workbench-cc--data '(:tickets () :repos () :commits () :infra () :time "now"))
+              (workbench/command-centre-view 'ic)
+              (workbench-cc--resize-timer nil)
+              (render-count 0))
+          (let ((cc-buf (get-buffer-create "*command-centre*")))
+            (unwind-protect
+                (cl-letf (((symbol-function 'get-buffer-window)
+                           (lambda (_name &rest _) (selected-window)))
+                          ((symbol-function 'workbench-cc--render)
+                           (lambda (_data) (cl-incf render-count))))
+                  ;; Call twice in rapid succession — debounce means only 1 timer
+                  (workbench-cc--on-resize nil)
+                  (workbench-cc--on-resize nil)
+                  ;; Only one timer scheduled (second cancelled the first)
+                  (should (timerp workbench-cc--resize-timer))
+                  ;; No render has fired yet (waiting for timer)
+                  (should (= render-count 0))
+                  ;; Fire the timer — only ONE render
+                  (funcall (timer--function workbench-cc--resize-timer))
+                  (should (= render-count 1)))
+              (when (timerp workbench-cc--resize-timer)
+                (cancel-timer workbench-cc--resize-timer)
+                (setq workbench-cc--resize-timer nil))
+              (kill-buffer cc-buf)))))
+    (remove-hook 'window-size-change-functions #'workbench-cc--on-resize)))
 
 (provide 'test-bugs)
 ;;; test-bugs.el ends here
