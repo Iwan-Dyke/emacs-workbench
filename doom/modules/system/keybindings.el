@@ -48,29 +48,20 @@
       :nvm "C-l" #'workbench/window-right)
 
 ;; Doom's workspaces module binds C-t to +workspace/new in
-;; `evil-normal-state-map'. That binding can re-assert after our module loads
-;; (workspace state reinitialisation on later frame/persp events). A simple
-;; (after! persp-mode (define-key ...)) only fires once at load time and gets
-;; overwritten. Instead, use an advice that strips the binding every time
-;; persp-mode tries to set it up, then bind C-t via general-override which
-;; has higher priority than evil state maps.
+;; `evil-normal-state-map'. Use general-override-mode-map which has higher
+;; priority than evil state maps, making it immune to persp re-assertion.
 (after! persp-mode
   (define-key evil-normal-state-map (kbd "C-t") nil)
   (define-key evil-visual-state-map (kbd "C-t") nil)
   (define-key evil-motion-state-map (kbd "C-t") nil))
 
-;; Persistent: re-assert our binding any time persp overwrites it
-(defun workbench--strip-persp-ct (&rest _)
-  "Ensure C-t is bound to popup terminal, not Doom's +workspace/new."
-  (define-key evil-normal-state-map (kbd "C-t") #'workbench/toggle-popup-terminal)
-  (define-key evil-visual-state-map (kbd "C-t") #'workbench/toggle-popup-terminal)
-  (define-key evil-motion-state-map (kbd "C-t") #'workbench/toggle-popup-terminal))
-
-(add-hook 'persp-mode-hook #'workbench--strip-persp-ct)
-(add-hook 'persp-activated-functions #'workbench--strip-persp-ct)
-(add-hook 'after-make-frame-functions #'workbench--strip-persp-ct)
-
+;; Fallback for before general loads
 (map! :nvm "C-t" #'workbench/toggle-popup-terminal)
+
+;; Authoritative binding — general-override-mode-map wins over all evil state maps
+(after! general
+  (general-define-key :keymaps 'override :states '(normal visual motion)
+    "C-t" #'workbench/toggle-popup-terminal))
 
 ;; ── Global coverage for window navigation and popup terminal ──────────────
 ;;
