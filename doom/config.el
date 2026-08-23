@@ -1,5 +1,20 @@
 ;;; config.el -*- lexical-binding: t; -*-
 
+;; ── Module Load Order ─────────────────────────────────────────────────────────
+;;
+;; Modules are loaded in dependency order. Rules:
+;;   1. system/core MUST load first (provides profile, defvars)
+;;   2. tools/shell MUST precede tools/jira and workflows/* (shell helpers)
+;;   3. tools/popup MUST precede tools/git and tools/terminals (popup infra)
+;;   4. tools/async-eval MUST precede tools/jira and workflows/command-centre
+;;   5. tools/files MUST precede workflows/* (project-root, treemacs)
+;;   6. tools/jira MUST precede workflows/org and workflows/command-centre
+;;   7. workflows/coding MUST precede workflows/session (workspace ops)
+;;   8. workflows/ai MUST precede workflows/coding (project AI pane)
+;;   9. system/keybindings MUST load last (references all other modules)
+;;
+;; Do NOT reorder without checking these constraints.
+
 (load! "modules/system/core")
 (load! "modules/system/interface")
 (load! "modules/system/visual")
