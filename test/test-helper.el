@@ -189,6 +189,7 @@ Override in individual tests to simulate workspace state.")
   (load (expand-file-name path doom-user-dir) nil t))
 
 ;; Load shared shell module — foundational dependency for all modules.
+(workbench-test-load-module "modules/system/core")
 (workbench-test-load-module "modules/tools/shell")
 (workbench-test-load-module "modules/tools/popup")
 (workbench-test-load-module "modules/tools/async-eval")

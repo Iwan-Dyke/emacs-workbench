@@ -594,9 +594,9 @@ rather than landing on whichever window was focused when popup was opened."
       (should (equal (workbench--popup-terminal-sensible-root) "/tmp/ws-dir/")))))
 
 (ert-deftest popup-terminal/sensible-root-falls-back-to-code-root ()
-  "sensible-root falls back to workbench-jira-code-root when all else fails."
+  "sensible-root falls back to workbench-code-root when all else fails."
   (let ((workbench--workspace-directories (make-hash-table :test 'equal))
-        (workbench-jira-code-root "~/code/"))
+        (workbench-code-root "~/code/"))
     (cl-letf (((symbol-function 'workbench--project-root)
                (lambda () (expand-file-name "~/")))
               ((symbol-function '+workspace-current-name)
@@ -607,7 +607,7 @@ rather than landing on whichever window was focused when popup was opened."
 (ert-deftest popup-terminal/sensible-root-rejects-root-directory ()
   "sensible-root does not return / as the project root."
   (let ((workbench--workspace-directories (make-hash-table :test 'equal))
-        (workbench-jira-code-root "~/code/"))
+        (workbench-code-root "~/code/"))
     (cl-letf (((symbol-function 'workbench--project-root)
                (lambda () "/"))
               ((symbol-function '+workspace-current-name)

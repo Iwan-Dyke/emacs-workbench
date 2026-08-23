@@ -61,7 +61,7 @@
     ;; Simulate jira output with an empty SUMMARY field (adjacent tabs between KEY and TYPE)
     ;; Format: KEY\tSUMMARY\tTYPE\tUPDATED
     ;; The empty SUMMARY means KEY<TAB><TAB>TYPE<TAB>UPDATED
-    (cl-letf (((symbol-function 'workbench-jira--shell-or-error)
+    (cl-letf (((symbol-function 'workbench-shell-or-error)
                (lambda (&rest _)
                  (list :ok "DPT-99\t\tBug\t2025-06-01"))))
       (let* ((result (workbench-jira--fetch-tickets))

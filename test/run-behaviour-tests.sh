@@ -9,6 +9,7 @@ set -uo pipefail
 # Default profile: work (has the most to test — command centre, team-lead view)
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export WORKBENCH_TEST_ROOT="$REPO_ROOT"
 PROFILE="${1:-work}"
 DAEMON_NAME="workbench-${PROFILE}"
 TIMEOUT=5
@@ -310,8 +311,8 @@ test_full_layout() {
     result=$(eval_or_fail "full layout opens" '
       (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
         (+workspace-switch "files" t)
-        (dired (expand-file-name "doom" "'$REPO_ROOT'"))
-        (dired-goto-file (expand-file-name "doom/config.el" "'$REPO_ROOT'"))
+        (dired (expand-file-name "doom" (getenv "WORKBENCH_TEST_ROOT")))
+        (dired-goto-file (expand-file-name "doom/config.el" (getenv "WORKBENCH_TEST_ROOT")))
         (condition-case err
           (progn
             (workbench/open-project-workspace-full-layout)
@@ -584,7 +585,7 @@ test_popup_magit() {
     eval_or_fail "setup for magit" '
       (with-selected-frame (seq-find #'"'"'display-graphic-p (frame-list))
         (+workspace-switch "main" t)
-        (setq default-directory "'$REPO_ROOT'")
+        (setq default-directory (getenv "WORKBENCH_TEST_ROOT"))
         t)' >/dev/null
 
     # Toggle magit ON
@@ -639,7 +640,7 @@ test_project_dashboard() {
         (+workspace-switch "main" t)
         (condition-case err
           (progn
-            (workbench/open-project-dashboard "'$REPO_ROOT'")
+            (workbench/open-project-dashboard (getenv "WORKBENCH_TEST_ROOT"))
             "ok")
           (error (format "ERROR: %S" err))))') || return
 

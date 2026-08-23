@@ -59,7 +59,7 @@ stop profile="personal":
 restart profile="personal":
     ./bin/workbench restart {{profile}}
 
-restart-all:
+stop-all:
     ./bin/workbench stop personal
     ./bin/workbench stop work
 
