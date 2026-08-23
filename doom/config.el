@@ -22,10 +22,16 @@
 (load! "modules/workflows/command-centre")
 (load! "modules/system/keybindings")
 
-;; Override: upstream passes `t' to doom-initialize but the current signature
-;; expects (PROFILE-ID &optional INTERACTIVE?).
-;; Copied from Doom's modules/lang/emacs-lisp/autoload.el (commit 2024-06-xx).
-;; TODO: check on Doom upgrades — remove when upstream fixes the signature mismatch.
+;; ── Flycheck override ────────────────────────────────────────────────────────
+;;
+;; Copied from: Doom's modules/lang/emacs-lisp/autoload.el
+;; Doom commit:  2024-06-xx (pre doom-initialize signature change)
+;; Why:          Upstream passes `t' to doom-initialize but the current
+;;               signature expects (PROFILE-ID &optional INTERACTIVE?).
+;; Audit:        CHECK ON EVERY `doom upgrade'. Remove when upstream fixes the
+;;               signature mismatch in +emacs-lisp--flycheck-non-package-mode.
+;; Last checked: 2026-08-23
+;;
 (after! flycheck
   (define-minor-mode +emacs-lisp--flycheck-non-package-mode
     "Reduced flycheck verbosity for non-package elisp buffers."
