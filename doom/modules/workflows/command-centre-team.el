@@ -13,12 +13,7 @@
 
 ;;; ── Helpers ────────────────────────────────────────────────────────────────
 
-(defun workbench-cc--icon (fn name &optional face)
-  "Call nerd-icons FN with NAME, applying FACE. Returns empty string if unavailable."
-  (if (fboundp fn)
-      (let ((icon (funcall fn name)))
-        (if face (propertize icon 'face face) icon))
-    ""))
+(defalias 'workbench-cc--icon #'workbench-icon)
 
 (defun workbench-cc--tl-separator ()
   "Insert a visual separator line."
@@ -329,3 +324,6 @@ from the cached ticket list instead."
 
         (goto-char (point-min))))
     buf))
+
+(provide 'workbench-command-centre-team)
+;;; workflows/command-centre-team.el ends here
