@@ -6,6 +6,15 @@
 
 (require 'cl-lib)
 
+(declare-function workbench-jira-ensure-cache "modules/tools/jira")
+(declare-function workbench-jira-cache-tickets "modules/tools/jira")
+(declare-function workbench-jira-error-p "modules/tools/jira")
+(declare-function workbench-jira-days-since-update "modules/tools/jira")
+(declare-function workbench-jira-cache-fresh-p "modules/tools/jira")
+
+(defvar workbench-jira-stale-days)
+(defvar workbench-jira-after-refresh-hook)
+
 ;;; ── Org Directory ──────────────────────────────────────────────────────────
 
 (setq org-directory "~/org/")
