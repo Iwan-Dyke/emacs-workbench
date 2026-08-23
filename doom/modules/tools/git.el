@@ -1,6 +1,7 @@
 ;;; tools/git.el -*- lexical-binding: t; -*-
 
 (require 'seq)
+(require 'workbench-popup)
 (declare-function workbench--project-root "modules/tools/files")
 (declare-function magit-status "magit-status")
 (declare-function magit-refresh "magit-mode")

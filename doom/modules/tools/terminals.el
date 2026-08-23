@@ -1,5 +1,6 @@
 ;;; tools/terminals.el -*- lexical-binding: t; -*-
 
+(require 'workbench-popup)
 (declare-function workbench--project-root "modules/tools/files")
 
 ;; workbench--workspace-directories is defined in workflows/coding.el (hash-table).
@@ -49,7 +50,7 @@ registered directory, then falls back to `workbench-jira-code-root'."
       (or (and (boundp 'workbench--workspace-directories)
                (hash-table-p workbench--workspace-directories)
                (gethash (+workspace-current-name) workbench--workspace-directories))
-          (expand-file-name (or (bound-and-true-p workbench-jira-code-root) "~/code/"))))))
+          (expand-file-name (bound-and-true-p workbench-code-root))))))
 
 (defun workbench--popup-terminal-buffer ()
   "Return the popup terminal vterm buffer for the current workspace.

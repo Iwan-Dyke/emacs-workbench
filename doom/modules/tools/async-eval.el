@@ -45,13 +45,16 @@ NAME is a human-readable label for log messages (default: KEY symbol name)."
     ;; Spawn child Emacs
     (let* ((emacs-bin (expand-file-name invocation-name invocation-directory))
            (output-buf (generate-new-buffer (format " *%s-async*" label)))
-           (proc (make-process
-                  :name (format "%s-async" label)
-                  :buffer output-buf
-                  :command (list emacs-bin "--batch" "--eval"
-                                (prin1-to-string form))
-                  :noquery t
-                  :sentinel
+           (proc nil)
+           (timer nil))
+      (condition-case err
+          (setq proc (make-process
+                      :name (format "%s-async" label)
+                      :buffer output-buf
+                      :command (list emacs-bin "--batch" "--eval"
+                                    (prin1-to-string form))
+                      :noquery t
+                      :sentinel
                   (lambda (process _event)
                     (when (memq (process-status process) '(exit signal))
                       ;; Verify this sentinel belongs to the current operation
@@ -87,17 +90,21 @@ NAME is a human-readable label for log messages (default: KEY symbol name)."
                             ;; Always kill the output buffer
                             (when (buffer-live-p (process-buffer process))
                               (kill-buffer (process-buffer process))))))))))
-           ;; Timeout timer
-           (timer (run-at-time
-                   timeout-secs nil
-                   (lambda ()
-                     (when (and (process-live-p proc)
-                                (let ((entry (gethash key workbench-async--processes)))
-                                  (and entry (eq (car entry) proc))))
-                       (message "%s: timed out after %ds" label timeout-secs)
-                       (delete-process proc))))))
-      ;; Track state
-      (puthash key (cons proc timer) workbench-async--processes))))
+        (error
+         (when (buffer-live-p output-buf)
+           (kill-buffer output-buf))
+         (message "%s: failed to start process: %s" label (error-message-string err))))
+      ;; Timeout timer and state tracking (only when process started)
+      (when proc
+        (setq timer (run-at-time
+                     timeout-secs nil
+                     (lambda ()
+                       (when (and (process-live-p proc)
+                                  (let ((entry (gethash key workbench-async--processes)))
+                                    (and entry (eq (car entry) proc))))
+                         (message "%s: timed out after %ds" label timeout-secs)
+                         (delete-process proc)))))
+        (puthash key (cons proc timer) workbench-async--processes)))))
 
 (provide 'workbench-async-eval)
 ;;; tools/async-eval.el ends here

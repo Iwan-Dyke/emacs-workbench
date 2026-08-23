@@ -14,14 +14,18 @@
   "Jira username (email). Set in profiles/local.el.")
 (defvar workbench-jira-git-author nil
   "Git author name fragment for filtering commits. Set in profiles/local.el.")
-(defvar workbench-jira-code-root "~/code/"
-  "Root directory to scan for git repositories.")
+(defvar workbench-jira-code-root (if (boundp 'workbench-code-root) workbench-code-root "~/code/")
+  "Root directory to scan for git repositories.
+Defaults to `workbench-code-root'. Override in profiles/local.el if different.")
 (defvar workbench-jira-spark-url "http://localhost:8888"
   "URL to health-check the local Spark environment.")
 
 ;; Board config
 (defvar workbench-jira-wip-limit 9
   "Total board WIP limit (all teams combined).")
+
+(defvar workbench-jira-stale-days 14
+  "Days without update before a ticket is considered stale (two-week rule).")
 
 ;; Team config
 (defvar workbench-jira-team-name nil
@@ -47,10 +51,6 @@
 
 ;;; ── Shell Helpers ──────────────────────────────────────────────────────────
 
-(defalias 'workbench-jira--shell #'workbench-shell)
-(defalias 'workbench-jira--shell-lines #'workbench-shell-lines)
-(defalias 'workbench-jira--shell-or-error #'workbench-shell-or-error)
-
 ;;; ── Error helpers ──────────────────────────────────────────────────────────
 
 (defun workbench-jira-error-p (result)
@@ -61,13 +61,31 @@
   "Return the error reason string from RESULT."
   (cadr result))
 
+;;; ── TSV Parsing ────────────────────────────────────────────────────────────
+
+(defun workbench-jira--parse-tsv (output keys)
+  "Parse tab-separated OUTPUT into a list of plists.
+KEYS is a list of keywords mapping to each column (e.g. (:key :summary :type)).
+Returns a list of plists or nil for empty output."
+  (when (and output (not (string-empty-p output)))
+    (mapcar (lambda (line)
+              (let ((parts (split-string line "\t"))
+                    (result nil)
+                    (idx 0))
+                (dolist (key keys)
+                  (push key result)
+                  (push (string-trim (or (nth idx parts) "")) result)
+                  (setq idx (1+ idx)))
+                (nreverse result)))
+            (split-string output "\n" t))))
+
 ;;; ── Fetch Functions ────────────────────────────────────────────────────────
 
 (defun workbench-jira--fetch-tickets ()
   "Fetch In Progress tickets. Returns list of plists, or (:error REASON)."
   (if (not (and workbench-jira-project workbench-jira-user))
       (list :error "Jira project/user not configured")
-    (let ((result (workbench-jira--shell-or-error
+    (let ((result (workbench-shell-or-error
                    nil "jira" "issue" "list"
                    "-p" workbench-jira-project
                    "-a" workbench-jira-user
@@ -76,22 +94,13 @@
                    "--columns" "KEY,SUMMARY,TYPE,UPDATED")))
       (if (eq :error (car result))
           result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (mapcar (lambda (line)
-                      (let ((parts (split-string line "\t")))
-                        (list :key (string-trim (or (nth 0 parts) ""))
-                              :summary (string-trim (or (nth 1 parts) ""))
-                              :type (string-trim (or (nth 2 parts) ""))
-                              :updated (string-trim (or (nth 3 parts) "")))))
-                    (split-string output "\n" t))))))))
+        (workbench-jira--parse-tsv (cadr result) '(:key :summary :type :updated))))))
 
 (defun workbench-jira--fetch-done ()
   "Fetch recently Done tickets (last 3). Returns list of plists, or (:error REASON)."
   (if (not (and workbench-jira-project workbench-jira-user))
       (list :error "Jira project/user not configured")
-    (let ((result (workbench-jira--shell-or-error
+    (let ((result (workbench-shell-or-error
                    nil "jira" "issue" "list"
                    "-p" workbench-jira-project
                    "-a" workbench-jira-user
@@ -100,22 +109,13 @@
                    "--columns" "KEY,SUMMARY")))
       (if (eq :error (car result))
           result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (seq-take
-             (mapcar (lambda (line)
-                       (let ((parts (split-string line "\t")))
-                         (list :key (string-trim (or (nth 0 parts) ""))
-                               :summary (string-trim (or (nth 1 parts) "")))))
-                     (split-string output "\n" t))
-             3)))))))
+        (seq-take (workbench-jira--parse-tsv (cadr result) '(:key :summary)) 3)))))
 
 (defun workbench-jira--fetch-next ()
   "Fetch Next queue tickets (top 3). Returns list of plists, or (:error REASON)."
   (if (not workbench-jira-project)
       (list :error "Jira project not configured")
-    (let ((result (workbench-jira--shell-or-error
+    (let ((result (workbench-shell-or-error
                    nil "jira" "issue" "list"
                    "-p" workbench-jira-project
                    "-s" workbench-jira-status-next
@@ -123,17 +123,7 @@
                    "--columns" "KEY,SUMMARY,TYPE")))
       (if (eq :error (car result))
           result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (seq-take
-             (mapcar (lambda (line)
-                       (let ((parts (split-string line "\t")))
-                         (list :key (string-trim (or (nth 0 parts) ""))
-                               :summary (string-trim (or (nth 1 parts) ""))
-                               :type (string-trim (or (nth 2 parts) "")))))
-                     (split-string output "\n" t))
-             3)))))))
+        (seq-take (workbench-jira--parse-tsv (cadr result) '(:key :summary :type)) 3)))))
 
 (defun workbench-jira--fetch-team-by-status (status)
   "Fetch team tickets in STATUS via JQL. Returns list of plists, or (:error REASON)."
@@ -141,27 +131,18 @@
       (list :error "Jira project/team not configured")
     (let* ((jql (format "project = \"%s\" AND team = \"%s\" AND status = \"%s\""
                         workbench-jira-project workbench-jira-team-id status))
-           (result (workbench-jira--shell-or-error
+           (result (workbench-shell-or-error
                     nil "jira" "issue" "list"
                     "--jql" jql
                     "--plain" "--no-headers"
                     "--columns" "KEY,SUMMARY,ASSIGNEE,UPDATED")))
       (if (eq :error (car result))
           result
-        (let ((output (cadr result)))
-          (if (string-empty-p output)
-              '()
-            (mapcar (lambda (line)
-                      (let ((parts (split-string line "\t")))
-                        (list :key (string-trim (or (nth 0 parts) ""))
-                              :summary (string-trim (or (nth 1 parts) ""))
-                              :assignee (string-trim (or (nth 2 parts) ""))
-                              :updated (string-trim (or (nth 3 parts) "")))))
-                    (split-string output "\n" t))))))))
+        (workbench-jira--parse-tsv (cadr result) '(:key :summary :assignee :updated))))))
 
 (defun workbench-jira--ticket-details (key)
   "Get extra details for KEY: last comment snippet and parent."
-  (when-let ((output (workbench-jira--shell
+  (when-let ((output (workbench-shell
                       nil "jira" "issue" "view" key "--comments" "1" "--plain")))
     (let ((parent nil) (comment nil))
       (when (string-match "Parent:\\s-*\\([A-Z]+-[0-9]+\\)" output)
@@ -172,7 +153,7 @@
 
 (defun workbench-jira--ticket-last-comment-date (key)
   "Get date of last comment on KEY, or nil."
-  (when-let ((output (workbench-jira--shell
+  (when-let ((output (workbench-shell
                       nil "jira" "issue" "view" key "--plain")))
     (when (string-match "• \\([A-Z][a-z]+, [0-9]+ [A-Z][a-z]+ [0-9]+\\) •" output)
       (match-string 1 output))))
@@ -185,7 +166,7 @@
 
 (defun workbench-jira--team-ticket-last-comment (key)
   "Get last comment snippet and author for KEY."
-  (when-let ((output (workbench-jira--shell
+  (when-let ((output (workbench-shell
                       nil "jira" "issue" "view" key "--comments" "1" "--plain")))
     (let ((author nil) (snippet nil))
       (when (string-match "\\([A-Za-z ]+\\) •.*• Latest comment" output)
@@ -301,18 +282,16 @@ three fetch calls and returns the result as a plist."
      'jira form
      (lambda (result)
        (when result
-         (let ((merged (list :tickets (if (workbench-jira-error-p (plist-get result :tickets))
-                                         (plist-get workbench-jira--cache :tickets)
-                                       (plist-get result :tickets))
-                             :done (if (workbench-jira-error-p (plist-get result :done))
-                                       (plist-get workbench-jira--cache :done)
-                                     (plist-get result :done))
-                             :next (if (workbench-jira-error-p (plist-get result :next))
-                                       (plist-get workbench-jira--cache :next)
-                                     (plist-get result :next)))))
-           (setq workbench-jira--cache merged))
-         (setq workbench-jira--cache-time (current-time))
-         (run-hooks 'workbench-jira-after-refresh-hook)))
+         (let ((merged-tickets (if (workbench-jira-error-p (plist-get result :tickets))
+                                   (plist-get workbench-jira--cache :tickets)
+                                 (plist-get result :tickets)))
+               (merged-done (if (workbench-jira-error-p (plist-get result :done))
+                                (plist-get workbench-jira--cache :done)
+                              (plist-get result :done)))
+               (merged-next (if (workbench-jira-error-p (plist-get result :next))
+                                (plist-get workbench-jira--cache :next)
+                              (plist-get result :next))))
+           (workbench-jira-set-cache merged-tickets merged-done merged-next))))
      60 "Jira refresh")))
 
 (defun workbench-jira-ensure-cache ()
@@ -347,7 +326,8 @@ three fetch calls and returns the result as a plist."
              (not workbench-jira-external-refresh-p))
     (workbench-jira-start-timer)))
 
-;; Start the timer when Jira is configured
-(add-hook 'doom-init-ui-hook #'workbench-jira--maybe-start-timer)
+;; Start the timer when Jira is configured (skip in batch/child Emacs)
+(unless noninteractive
+  (add-hook 'doom-init-ui-hook #'workbench-jira--maybe-start-timer))
 
 (provide 'workbench-jira)
