@@ -128,7 +128,7 @@
            (gauge-cx (+ pad gauge-r (funcall s 10)))
            (gauge-cy (+ y gauge-r))
            (gauge-width (funcall s 10))
-           (angle (min 359.9 (* 360.0 (/ (min (float wip-count) wip-limit) wip-limit))))
+           (angle (min 359.9 (* 360.0 (/ (min (float wip-count) (max 1 wip-limit)) (max 1 wip-limit)))))
            (gauge-colour (cond ((>= wip-count wip-limit) red)
                                ((>= wip-count (- wip-limit 2)) yellow)
                                (t green))))
@@ -312,7 +312,7 @@
                   :x (+ pad (funcall s 490)) :y y :font-size font-xs
                   :fill dim :font-family "monospace")
         ;; Second line: last commit message
-        (when (not (string-empty-p last-msg))
+        (when (and last-msg (not (string-empty-p last-msg)))
           (svg-text svg (truncate-string-to-width last-msg
                           (max 1 (/ (- w pad (funcall s 60)) (funcall s 7))))
                     :x (+ pad (funcall s 16)) :y (+ y (funcall s 16)) :font-size font-xs
@@ -392,3 +392,6 @@
         (insert-image (svg-image svg :scale (/ 1.0 scale)))
         (goto-char (point-min))))
     buf))
+
+(provide 'workbench-command-centre-svg)
+;;; workflows/command-centre-svg.el ends here

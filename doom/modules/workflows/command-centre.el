@@ -30,6 +30,7 @@ and runs the appropriate collect function. CALLBACK receives the parsed
 plist on success, or nil on failure."
   (let* ((shell-file (expand-file-name "modules/tools/shell.el" doom-user-dir))
          (jira-file (expand-file-name "modules/tools/jira.el" doom-user-dir))
+         (repos-data-file (expand-file-name "modules/workflows/repos-data.el" doom-user-dir))
          (data-file (expand-file-name "modules/workflows/command-centre-data.el"
                                       doom-user-dir))
          (view workbench/command-centre-view)
@@ -49,6 +50,7 @@ plist on success, or nil on failure."
                         workbench-jira-status-wip ,workbench-jira-status-wip
                         workbench-jira-status-done ,workbench-jira-status-done)
                   (load ,jira-file nil t)
+                  (load ,repos-data-file nil t)
                   (load ,data-file nil t)
                   (let ((result ,(pcase view
                                    ('team-lead '(workbench-cc--collect-team-lead))
@@ -77,12 +79,18 @@ plist on success, or nil on failure."
            ;; IC view returns :tickets (personal), team-lead returns :wip (team).
            ;; For the shared cache (used by org agenda), we need personal tickets.
            ;; Only populate if the data contains :tickets (IC view); team-lead view
-           ;; doesn't fetch personal tickets so we must not overwrite with nil.
+           ;; fetches personal tickets but its :done/:next are team-scoped, so
+           ;; preserve the existing personal done/next in that case.
            (let ((tickets (plist-get data :tickets)))
              (when (and tickets (not (workbench-jira-error-p tickets)))
-               (workbench-jira-set-cache tickets
-                                         (plist-get data :done)
-                                         (plist-get data :next))))
+               (if (eq workbench/command-centre-view 'ic)
+                   (workbench-jira-set-cache tickets
+                                             (plist-get data :done)
+                                             (plist-get data :next))
+                 ;; Team-lead: only update :tickets, preserve personal done/next
+                 (workbench-jira-set-cache tickets
+                                           (plist-get (workbench-jira-cache) :done)
+                                           (plist-get (workbench-jira-cache) :next)))))
            (when (buffer-live-p (get-buffer workbench-cc--buffer-name))
              (workbench-cc--render-current))
            (message "Command centre: refreshed"))
@@ -249,3 +257,6 @@ happens to be current."
                            (workbench-cc--render workbench-cc--data)))))))
 
 (add-hook 'window-size-change-functions #'workbench-cc--on-resize)
+
+(provide 'workbench-command-centre)
+;;; workflows/command-centre.el ends here

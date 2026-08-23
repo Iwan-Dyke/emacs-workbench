@@ -5,6 +5,8 @@
 
 (require 'seq)
 
+(declare-function workbench-repos--repo-status "modules/workflows/repos-data")
+
 ;;; ── Jira (delegated to shared module) ──────────────────────────────────────
 
 (defun workbench-cc--jira-tickets ()
@@ -41,24 +43,7 @@
          (sorted (sort with-commit (lambda (a b) (> (cdr a) (cdr b))))))
     (seq-take (mapcar #'car sorted) 5)))
 
-(defun workbench-cc--repo-status (dir)
-  "Get git status plist for DIR."
-  (let ((branch (workbench-shell dir "git" "branch" "--show-current"))
-        (dirty (workbench-shell-lines dir "git" "status" "--porcelain"))
-        (ab (workbench-shell dir "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
-        (last-commit (workbench-shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%ar"))
-        (last-msg (workbench-shell dir "git" "log" "-1" (concat "--author=" workbench-jira-git-author) "--format=%s")))
-    (let (ahead behind)
-      (when (and ab (string-match "\\([0-9]+\\)\t\\([0-9]+\\)" ab))
-        (setq ahead (string-to-number (match-string 1 ab))
-              behind (string-to-number (match-string 2 ab))))
-      (list :name (file-name-nondirectory dir)
-            :branch (or branch "(detached)")
-            :dirty (length (or dirty '()))
-            :ahead (or ahead 0)
-            :behind (or behind 0)
-            :last-commit (or last-commit "")
-            :last-msg (or last-msg "")))))
+;;; ── Git / Repos ────────────────────────────────────────────────────────────
 
 (defun workbench-cc--recent-commits ()
   "Get last 5 commits across all repos from the past 3 days, most recent first."
@@ -128,7 +113,7 @@ Jira fields may contain (:error REASON) instead of a list when fetch fails."
     (list :tickets tickets
           :done (workbench-cc--jira-done)
           :next (workbench-cc--jira-next)
-          :repos (mapcar #'workbench-cc--repo-status (workbench-cc--recent-repos))
+          :repos (mapcar #'workbench-repos--repo-status (workbench-cc--recent-repos))
           :commits (workbench-cc--recent-commits)
           :infra (workbench-cc--infra-status)
           :time (format-time-string "%A %d %B, %H:%M"))))
@@ -199,3 +184,6 @@ cache can be populated for org agenda sync."
           :attention attention
           :infra (workbench-cc--infra-status)
           :time (format-time-string "%A %d %B, %H:%M"))))
+
+(provide 'workbench-command-centre-data)
+;;; workflows/command-centre-data.el ends here
