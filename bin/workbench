@@ -8,10 +8,14 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -f "$repo_root/bin/workbench.local" ]; then
     local_perms=$(stat -f '%A' "$repo_root/bin/workbench.local" 2>/dev/null \
                   || stat -c '%a' "$repo_root/bin/workbench.local" 2>/dev/null)
-    if [ -n "$local_perms" ] && [ "$local_perms" != "600" ] && [ "$local_perms" != "700" ]; then
-        printf "warn workbench.local has permissions %s (expected 600); run: chmod 600 bin/workbench.local\n" "$local_perms" >&2
+    if [ "$local_perms" = "600" ] || [ "$local_perms" = "700" ]; then
+        . "$repo_root/bin/workbench.local"
+    elif [ -z "$local_perms" ]; then
+        printf "error: cannot determine permissions for workbench.local; refusing to source\n" >&2
+    else
+        printf "error: workbench.local has permissions %s (expected 600). Fix with: chmod 600 bin/workbench.local\n" "$local_perms" >&2
+        printf "Refusing to source workbench.local\n" >&2
     fi
-    . "$repo_root/bin/workbench.local"
 fi
 
 command_name="start"
