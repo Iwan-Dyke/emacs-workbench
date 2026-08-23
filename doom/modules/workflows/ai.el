@@ -17,8 +17,11 @@
 
 (defun workbench--ai-command (tool)
   "Return the launch command string for TOOL."
-  (or (cdr (assoc tool workbench/ai-commands))
-      (user-error "No command configured for AI tool: %s" tool)))
+  (let ((cmd (or (cdr (assoc tool workbench/ai-commands))
+                 (user-error "No command configured for AI tool: %s" tool))))
+    (unless (string-match-p "\\`[a-zA-Z0-9._/-]+\\'" cmd)
+      (user-error "AI command contains unsafe characters: %s" cmd))
+    cmd))
 
 (defun workbench--launch-vterm-agent (buffer-name tool)
   "Launch TOOL in a fresh vterm BUFFER-NAME in the current window.
@@ -97,14 +100,15 @@ Only searches the selected frame to avoid affecting panes on other frames."
   "Show TOOL as the far-right AI pane for the current workspace.
 Hides any other project AI pane first so only one is visible (exclusive).
 Launches at the project root so the agent sees the whole project."
-  ;; Cancel any pending resize timer from a previous AI pane to prevent
-  ;; accumulation on rapid toggle cycles.
-  (when-let ((existing-buf (get-buffer (workbench--project-ai-buffer-name tool))))
-    (when (buffer-live-p existing-buf)
-      (with-current-buffer existing-buf
-        (when (timerp workbench--ai-pane-resize-timer)
-          (cancel-timer workbench--ai-pane-resize-timer)
-          (setq workbench--ai-pane-resize-timer nil)))))
+  ;; Cancel resize timers on ANY existing project AI buffer for this workspace
+  ;; to prevent accumulation when rapidly switching between tools.
+  (dolist (tool-name (mapcar #'car workbench/ai-commands))
+    (when-let ((buf (get-buffer (workbench--project-ai-buffer-name tool-name))))
+      (when (buffer-live-p buf)
+        (with-current-buffer buf
+          (when (timerp workbench--ai-pane-resize-timer)
+            (cancel-timer workbench--ai-pane-resize-timer)
+            (setq workbench--ai-pane-resize-timer nil))))))
   (when-let ((other (workbench--project-ai-window)))
     (delete-window other))
   (let* ((buffer-name (workbench--project-ai-buffer-name tool))
