@@ -46,6 +46,10 @@ Set in profile files to switch between individual contributor and team lead dash
 (workbench--load-profile-file "local.el")
 (workbench--load-profile-file "secrets.el")
 
+(defvar workbench-code-root "~/code/"
+  "Root directory containing git repositories.
+Used by terminals (fallback root), repos workspace, and command centre.")
+
 (defun workbench/show-profile ()
   "Show the active Emacs Workbench profile."
   (interactive)
