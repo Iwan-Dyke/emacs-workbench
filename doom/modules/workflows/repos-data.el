@@ -63,6 +63,7 @@ Returns FOUND with any new repos prepended. SEEN prevents cycles."
          (porcelain (workbench-shell path "git" "status" "--porcelain"))
          (ab (workbench-shell path "git" "rev-list" "--left-right" "--count" "HEAD...@{upstream}"))
          (last-commit (workbench-shell path "git" "log" "-1" "--format=%ar"))
+         (last-msg (workbench-shell path "git" "log" "-1" "--format=%s"))
          (stash-output (workbench-shell path "git" "stash" "list"))
          (dirty-lines (when porcelain (split-string porcelain "\n" t)))
          (dirty-count (length (or dirty-lines '())))
@@ -79,6 +80,7 @@ Returns FOUND with any new repos prepended. SEEN prevents cycles."
           :ahead ahead
           :behind behind
           :last-commit (or last-commit "")
+          :last-msg (or last-msg "")
           :stash (if stash-output (length (split-string stash-output "\n" t)) 0))))
 
 (defun workbench-repos--get-all-statuses (paths)

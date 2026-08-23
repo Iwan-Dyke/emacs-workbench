@@ -88,12 +88,7 @@
   (insert "  Configure roots in profiles/local.el:\n")
   (insert "    (setq workbench-repos-roots '(\"~/code/\"))\n"))
 
-(defun workbench-repos--icon (fn name &optional face)
-  "Call nerd-icons FN with NAME, applying FACE. Empty string if unavailable."
-  (if (fboundp fn)
-      (let ((icon (funcall fn name)))
-        (if face (propertize icon 'face face) icon))
-    ""))
+(defalias 'workbench-repos--icon #'workbench-icon)
 
 (defun workbench-repos--separator ()
   "Insert a visual separator."
@@ -392,7 +387,11 @@ Spawns a child Emacs to do the scanning so the UI is not blocked."
   "Non-nil when an async fetch-all operation is running.")
 
 (defun workbench-repos-fetch-all ()
-  "Fetch all repos asynchronously in parallel."
+  "Fetch all repos asynchronously in parallel.
+After all fetches complete, refreshes repo statuses asynchronously in a
+child Emacs (same pattern as `workbench-repos-refresh') to avoid blocking
+the UI. The `workbench-repos--fetch-in-progress' guard is only cleared
+once the async status refresh finishes, preventing concurrent operations."
   (interactive)
   (when workbench-repos--fetch-in-progress
     (user-error "Fetch already in progress"))
@@ -418,17 +417,39 @@ Spawns a child Emacs to do the scanning so the UI is not blocked."
                (if ok (cl-incf succeeded) (cl-incf failed))
                (cl-incf finished)
                (when (= finished total)
-                 ;; All fetches done — refresh statuses and redraw
-                 (setq workbench-repos--fetch-in-progress nil)
-                 (let ((paths (mapcar (lambda (r) (plist-get r :path))
-                                      workbench-repos--statuses)))
-                   (setq workbench-repos--statuses
-                         (workbench-repos--get-all-statuses paths)))
-                 (workbench-repos--redraw)
-                 (message "Repos: fetched %d%s"
-                          succeeded
-                          (if (> failed 0)
-                              (format " (%d failed)" failed) "")))))))))))
+                 ;; All fetches done — collect updated statuses asynchronously
+                 ;; to avoid blocking the UI with N synchronous git calls.
+                 (let* ((paths (mapcar (lambda (r) (plist-get r :path))
+                                       workbench-repos--statuses))
+                        (fetch-succeeded succeeded)
+                        (fetch-failed failed))
+                   (workbench-repos--async-status-refresh
+                    paths
+                    (lambda (result)
+                      (setq workbench-repos--fetch-in-progress nil)
+                      (when result
+                        (setq workbench-repos--statuses result)
+                        (workbench-repos--redraw))
+                      (message "Repos: fetched %d%s"
+                               fetch-succeeded
+                               (if (> fetch-failed 0)
+                                   (format " (%d failed)" fetch-failed)
+                                 ""))))))))))))))
+
+(defun workbench-repos--async-status-refresh (paths callback)
+  "Collect repo statuses for PATHS asynchronously, then call CALLBACK with result.
+Spawns a child Emacs to run `workbench-repos--get-all-statuses' without
+blocking the UI. CALLBACK receives the list of status plists, or nil on failure."
+  (let* ((shell-file (expand-file-name "modules/tools/shell.el" doom-user-dir))
+         (data-file (expand-file-name "modules/workflows/repos-data.el" doom-user-dir))
+         (form `(progn
+                  (require 'seq)
+                  (require 'cl-lib)
+                  (load ,shell-file nil t)
+                  (load ,data-file nil t)
+                  (let ((statuses (workbench-repos--get-all-statuses ',paths)))
+                    (prin1 statuses)))))
+    (workbench-async-eval 'repos-status form callback 30 "Repos status")))
 
 (defun workbench-repos-pull-selected ()
   "Pull the repo at point (only if clean and behind)."
@@ -478,8 +499,14 @@ Spawns a child Emacs to do the scanning so the UI is not blocked."
   (let ((buf (get-buffer workbench-repos--buffer-name)))
     (if (and buf (buffer-live-p buf) workbench-repos--statuses)
         (switch-to-buffer buf)
-      (workbench-repos-refresh)
-      (switch-to-buffer (get-buffer workbench-repos--buffer-name))))
+      ;; Create placeholder buffer immediately, refresh populates it async
+      (let ((buf (get-buffer-create workbench-repos--buffer-name)))
+        (with-current-buffer buf
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert "\n  Scanning repos...")))
+        (switch-to-buffer buf)
+        (workbench-repos-refresh))))
   (delete-other-windows))
 
 (provide 'workbench-repos)
