@@ -25,7 +25,7 @@
                      "personal")))
     (if (member profile workbench/valid-profiles)
         profile
-      (warn "Workbench: unknown profile '%s', defaulting to personal" profile)
+      (display-warning 'workbench (format "Unknown profile '%s', defaulting to personal" profile) :warning)
       "personal"))
   "Active Emacs Workbench profile.")
 
@@ -42,13 +42,13 @@
   "Which command centre view to render: 'ic (default) or 'team-lead.
 Set in profile files to switch between individual contributor and team lead dashboards.")
 
-(workbench--load-profile-file (concat workbench/profile ".el"))
-(workbench--load-profile-file "local.el")
-(workbench--load-profile-file "secrets.el")
-
 (defvar workbench-code-root "~/code/"
   "Root directory containing git repositories.
 Used by terminals (fallback root), repos workspace, and command centre.")
+
+(workbench--load-profile-file (concat workbench/profile ".el"))
+(workbench--load-profile-file "local.el")
+(workbench--load-profile-file "secrets.el")
 
 (defun workbench/show-profile ()
   "Show the active Emacs Workbench profile."
