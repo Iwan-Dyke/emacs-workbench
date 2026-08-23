@@ -75,7 +75,7 @@
     (setq dimmer-fraction 0.4)
     ;; Don't dim certain buffers where visibility matters
     (setq dimmer-exclusion-regexp-list
-          '("\\*Minibuf" "\\*which-key" "\\*Messages"))
+          '("\\*Minibuf" "\\*which-key" "\\*Messages" "\\*vterm" "\\*Treemacs"))
     (when (fboundp 'dimmer-configure-magit)
       (dimmer-configure-magit))
     (dimmer-mode 1)))
@@ -86,15 +86,22 @@
   "Return non-nil if the matrix theme is currently loaded."
   (memq 'workbench-matrix custom-enabled-themes))
 
+(defun workbench--disable-matrix-line-spacing ()
+  "Disable matrix line-spacing in vterm to prevent cursor misalignment."
+  (when (workbench--matrix-theme-active-p)
+    (setq-local line-spacing nil)))
+
 (defun workbench--apply-matrix-visuals ()
   "Apply extra visual settings when matrix theme is active."
   (when (workbench--matrix-theme-active-p)
     ;; Extra line-spacing for CRT scanline row separation feel
-    (setq-default line-spacing 2)))
+    (setq-default line-spacing 2)
+    (add-hook 'vterm-mode-hook #'workbench--disable-matrix-line-spacing)))
 
 (defun workbench--remove-matrix-visuals ()
   "Remove matrix-specific visual settings."
-  (setq-default line-spacing nil))
+  (setq-default line-spacing nil)
+  (remove-hook 'vterm-mode-hook #'workbench--disable-matrix-line-spacing))
 
 ;; Apply/remove matrix visuals on theme switch
 (add-hook 'doom-load-theme-hook
@@ -105,11 +112,28 @@
 
 ;;; ── Zone-matrix screensaver ────────────────────────────────────────────────
 
+(defvar workbench/enable-screensaver t
+  "When non-nil, zone-matrix screensaver activates after idle timeout.")
+
+(defun workbench/toggle-screensaver ()
+  "Toggle the zone-matrix screensaver on or off."
+  (interactive)
+  (setq workbench/enable-screensaver (not workbench/enable-screensaver))
+  (if workbench/enable-screensaver
+      (progn
+        (when (fboundp 'zone-when-idle)
+          (zone-when-idle 300))
+        (message "Screensaver enabled"))
+    (when (fboundp 'zone-leave-me-alone)
+      (zone-leave-me-alone))
+    (message "Screensaver disabled")))
+
 (after! zone
   (when (and (require 'zone-matrix nil t)
              (string= workbench/profile "personal"))
     (setq zone-programs [zone-matrix])
-    (when (fboundp 'zone-when-idle)
+    (when (and workbench/enable-screensaver
+               (fboundp 'zone-when-idle))
       (zone-when-idle 300))))
 
 ;;; visual.el ends here
