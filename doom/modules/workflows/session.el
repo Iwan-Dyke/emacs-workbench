@@ -19,6 +19,8 @@
 ;; workspaces and deleting the dashboard. Disable both.
 (after! persp-mode
   (setq persp-auto-save-opt 0)
+  (unless (fboundp '+workspaces-delete-associated-workspace-h)
+    (display-warning 'workbench "Doom workspace cleanup hook not found — frame/workspace lifecycle may misbehave" :warning))
   (remove-hook 'delete-frame-functions #'+workspaces-delete-associated-workspace-h)
   (remove-hook 'server-done-hook #'+workspaces-delete-associated-workspace-h))
 
@@ -34,30 +36,30 @@ Each step is wrapped in condition-case so a failure in one workspace
     (user-error "Doom workspaces are not available"))
   (let ((starting-workspace (+workspace-current-name)))
     ;; Agenda workspace
-    (condition-case nil
+    (condition-case err
         (progn
           (+workspace-switch "agenda" t)
           (when (fboundp 'workbench-org/open-agenda)
             (workbench-org/open-agenda)))
-      (error nil))
+      (error (message "Workbench: failed to create agenda workspace: %s" (error-message-string err))))
     ;; AI workspace
-    (condition-case nil
+    (condition-case err
         (workbench/open-default-ai-workspace)
-      (error nil))
+      (error (message "Workbench: failed to create AI workspace: %s" (error-message-string err))))
     ;; Files workspace
-    (condition-case nil
+    (condition-case err
         (progn
           (+workspace-switch "files" t)
           (workbench/open-files))
-      (error nil))
+      (error (message "Workbench: failed to create files workspace: %s" (error-message-string err))))
     ;; Repos workspace
-    (condition-case nil
+    (condition-case err
         (progn
           (+workspace-switch "repos" t)
           (workbench-repos-refresh)
           (switch-to-buffer (get-buffer-create "*repos*"))
           (delete-other-windows))
-      (error nil))
+      (error (message "Workbench: failed to create repos workspace: %s" (error-message-string err))))
     ;; Return to dashboard
     (+workspace-switch starting-workspace t)
     (+workspace/display)))
