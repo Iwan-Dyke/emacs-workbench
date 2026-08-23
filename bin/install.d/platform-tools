@@ -138,13 +138,17 @@ install_icon_fonts() {
 
     mkdir -p "$fonts_dir"
 
+    local tmp_path="$font_path.tmp"
+
     if have_command curl; then
-        run "download nerd-icons font" curl -fsSL -o "$font_path" "$nerd_font_url" || {
+        run "download nerd-icons font" curl -fsSL -o "$tmp_path" "$nerd_font_url" || {
+            rm -f "$tmp_path"
             warn "could not download nerd-icons font; icons may be missing"
             return
         }
     elif have_command wget; then
-        run "download nerd-icons font" wget -qO "$font_path" "$nerd_font_url" || {
+        run "download nerd-icons font" wget -qO "$tmp_path" "$nerd_font_url" || {
+            rm -f "$tmp_path"
             warn "could not download nerd-icons font; icons may be missing"
             return
         }
@@ -153,24 +157,27 @@ install_icon_fonts() {
         return
     fi
 
-    # Verify integrity
-    local actual_sha
+    # Verify integrity before moving to final path
+    local actual_sha=""
     if have_command shasum; then
-        actual_sha=$(shasum -a 256 "$font_path" | awk '{print $1}')
+        actual_sha=$(shasum -a 256 "$tmp_path" | awk '{print $1}')
     elif have_command sha256sum; then
-        actual_sha=$(sha256sum "$font_path" | awk '{print $1}')
+        actual_sha=$(sha256sum "$tmp_path" | awk '{print $1}')
     fi
 
     if [ -z "$actual_sha" ]; then
+        rm -f "$tmp_path"
         warn "no sha256 tool found; cannot verify font integrity"
         return
     fi
 
     if [ "$actual_sha" != "$nerd_font_sha256" ]; then
-        rm -f "$font_path"
+        rm -f "$tmp_path"
         warn "nerd-icons font checksum mismatch (possible tampering); removed"
         return
     fi
+
+    mv "$tmp_path" "$font_path"
 
     if [ "$platform" != "Darwin" ] && have_command fc-cache; then
         run "refresh font cache" fc-cache -f "$fonts_dir" || true
