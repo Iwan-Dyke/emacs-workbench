@@ -35,6 +35,7 @@ test:
       -l test/unit/test-visual.el \
       -l test/unit/test-command-centre.el \
       -l test/unit/test-interface.el \
+      -l test/unit/test-keybindings.el \
       -f ert-run-tests-batch-and-exit
 
 test-behaviour profile="work":

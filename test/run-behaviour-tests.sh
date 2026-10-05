@@ -255,6 +255,36 @@ test_evil_states() {
         "workbench/toggle-popup-terminal"
 }
 
+test_vterm_bindings() {
+    info "── vterm TUI Bindings ──"
+
+    # vterm must start in insert state so bare keys (incl. Esc handling) reach
+    # the running TUI process instead of being intercepted by evil normal state.
+    assert_equal "vterm-mode initial evil state is insert" \
+        '(evil-initial-state (quote vterm-mode))' \
+        "insert"
+
+    # C-<escape> sends a real Escape to the process (single chord)
+    assert_equal "C-<escape> → vterm-send-escape" \
+        '(lookup-key vterm-mode-map (kbd "C-<escape>"))' \
+        "vterm-send-escape"
+
+    # C-c <escape> is the prefix-style fallback for the same
+    assert_equal "C-c <escape> → vterm-send-escape" \
+        '(lookup-key vterm-mode-map (kbd "C-c <escape>"))' \
+        "vterm-send-escape"
+
+    # C-c C-c still sends SIGINT to the process
+    assert_equal "C-c C-c → vterm-send-C-c" \
+        '(lookup-key vterm-mode-map (kbd "C-c C-c"))' \
+        "vterm-send-C-c"
+
+    # Window navigation still works from inside vterm
+    assert_equal "C-l → window-right in vterm" \
+        '(lookup-key vterm-mode-map (kbd "C-l"))' \
+        "workbench/window-right"
+}
+
 test_jira_config() {
     info "── Jira Configuration ──"
 
@@ -1002,6 +1032,7 @@ test_command_centre
 test_keybindings
 test_additional_keybindings
 test_evil_states
+test_vterm_bindings
 test_window_navigation
 test_jira_config
 test_treemacs_config

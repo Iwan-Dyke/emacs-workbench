@@ -106,7 +106,20 @@
   (evil-define-key 'insert vterm-mode-map
     (kbd "C-y") #'vterm-yank)
   (map! :map vterm-mode-map
-        "s-v" #'vterm-yank))
+        "s-v" #'vterm-yank)
+
+  ;; Interactive TUIs (kiro-cli, claude, and their sub-views like /usage) need
+  ;; a real Escape key. Evil binds bare Esc to "exit insert -> normal state",
+  ;; so it never reaches the process. Keep bare Esc for evil normal state
+  ;; (scrollback/copy) and use a Ctrl-modified Escape to send a real Escape:
+  ;;   Esc         -> evil normal state
+  ;;   C-<escape>  -> send Escape to the process (single chord; closes /usage)
+  ;;   C-c <esc>   -> also sends Escape (prefix-style fallback)
+  ;;   C-c C-c     -> send Ctrl-C / SIGINT (unchanged, above)
+  (evil-set-initial-state 'vterm-mode 'insert)
+  (map! :map vterm-mode-map
+        "C-<escape>" #'vterm-send-escape
+        "C-c <escape>" #'vterm-send-escape))
 
 ;;; ── Org Agenda ─────────────────────────────────────────────────────────────
 
