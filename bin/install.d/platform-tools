@@ -58,6 +58,11 @@ install_macos_platform_tools() {
     fi
 
     must_run "tap emacs-plus" brew tap d12frosted/emacs-plus || return
+    # Homebrew 7+ refuses to load formulae from third-party taps until trusted.
+    # `brew trust` is a no-op on older versions that lack the subcommand.
+    if brew trust --help >/dev/null 2>&1; then
+        run "trust emacs-plus tap" brew trust d12frosted/emacs-plus || true
+    fi
     must_run "install Homebrew core prerequisites" brew install "${macos_core_packages[@]}"
 }
 
@@ -84,8 +89,13 @@ install_apt_platform_tools() {
 # nerd-icons package but not the font, so without this the icons render as empty
 # boxes. Non-fatal: a missing font only affects appearance, so failures warn
 # rather than fail the whole install.
-nerd_font_url="https://raw.githubusercontent.com/rainstormstudio/nerd-icons.el/main/fonts/NFM.ttf"
-nerd_font_sha256="f0f624d9b474bea1662cf7e862d44aebe1ae1f6c7f9cb7a0ca5d0e5ac9561c60"
+#
+# Pinned to an immutable commit (not `main`) so the URL and checksum always
+# agree. Upstream updates NFM.ttf in place on `main`, which previously broke the
+# integrity check. To update: bump the commit SHA and the matching sha256.
+nerd_font_commit="7c51b3fcd9d43b55a1540fa31174fb4589993249"
+nerd_font_url="https://raw.githubusercontent.com/rainstormstudio/nerd-icons.el/${nerd_font_commit}/fonts/NFM.ttf"
+nerd_font_sha256="fe471e538392f51910faab985fa8e192a39dd3426125edd15b71b3680df0e749"
 
 install_icon_fonts() {
     local fonts_dir font_path
