@@ -54,6 +54,10 @@ In tests, this loads the real source file so tests run against actual code."
   "Stub — module declaration. No-op in tests."
   nil)
 
+(defmacro use-package! (_name &rest _args)
+  "Stub — package configuration macro. No-op in tests."
+  nil)
+
 ;;; ── Doom Workspace Stubs ───────────────────────────────────────────────────
 
 (defvar workbench-test--workspaces '()

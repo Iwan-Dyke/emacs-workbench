@@ -106,7 +106,7 @@
   (insert "  " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-repo" :face 'workbench-dashboard-project-name)
           " " (propertize (plist-get data :name) 'face 'workbench-dashboard-project-name) "\n")
   (insert "  " (propertize (plist-get data :path) 'face 'workbench-dashboard-path) "\n")
-  (when-let ((desc (plist-get data :description)))
+  (when-let* ((desc (plist-get data :description)))
     (insert "  " (propertize desc 'face 'shadow) "\n"))
   (insert "\n")
   (let ((size (plist-get data :size))
@@ -156,7 +156,7 @@
                 (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-arrow_up") (format " %d  " ahead)
                 (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-arrow_down") (format " %d" behind)
                 "\n")))
-    (when-let ((commit (plist-get data :last-commit)))
+    (when-let* ((commit (plist-get data :last-commit)))
       (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-git_commit") " "
               (if (string-match "\\([a-f0-9]+\\) \\(.*\\) (\\(.*\\))" commit)
                   (concat (propertize (match-string 1 commit) 'face 'workbench-dashboard-commit-hash)
@@ -185,7 +185,7 @@
 
 (defun workbench--dashboard-render-commands (directory)
   "Render available commands for DIRECTORY."
-  (when-let ((detected (workbench--dashboard-detect-task-runner directory)))
+  (when-let* ((detected (workbench--dashboard-detect-task-runner directory)))
     (let ((runner (car detected))
           (recipes (cdr detected)))
       (when recipes
@@ -231,7 +231,7 @@
      (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-rocket") (format "CI/CD (%s)" (plist-get data :source)))
     (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-workflow")
             " " (propertize (plist-get data :pipeline) 'face 'font-lock-constant-face) "\n")
-    (when-let ((steps (plist-get data :steps)))
+    (when-let* ((steps (plist-get data :steps)))
       (insert "    ")
       (let ((first t))
         (dolist (step steps)
@@ -240,7 +240,7 @@
           (insert (propertize step 'face 'font-lock-function-name-face))
           (setq first nil)))
       (insert "\n"))
-    (when-let ((trigger (plist-get data :trigger)))
+    (when-let* ((trigger (plist-get data :trigger)))
       (insert "    " (workbench--dashboard-icon 'nerd-icons-codicon "nf-cod-zap") " "
               (propertize (string-join trigger ", ") 'face 'shadow) "\n"))
     (insert "\n")))
@@ -250,7 +250,7 @@
   (when data
     (workbench--dashboard-separator)
     (workbench--dashboard-render-heading (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-history") "Recent")
-    (when-let ((commits (plist-get data :commits)))
+    (when-let* ((commits (plist-get data :commits)))
       (dolist (c commits)
         (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-git_commit") " "
                 (if (string-match "\\([a-f0-9]+\\) \\(.*\\)" c)
@@ -258,7 +258,7 @@
                             " " (match-string 2 c))
                   c)
                 "\n")))
-    (when-let ((changed (plist-get data :changed)))
+    (when-let* ((changed (plist-get data :changed)))
       (insert "\n")
       (dolist (f (seq-take changed 10))
         (insert "    " (workbench--dashboard-icon 'nerd-icons-octicon "nf-oct-diff") " "

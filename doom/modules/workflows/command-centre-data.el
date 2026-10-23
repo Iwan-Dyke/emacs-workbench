@@ -35,8 +35,8 @@
                                dirs))
          (with-commit (seq-filter #'identity
                         (mapcar (lambda (d)
-                                  (when-let ((date (workbench-shell
-                                                    d "git" "log" "-1"
+                                  (when-let* ((date (workbench-shell
+                                                     d "git" "log" "-1"
                                                     (concat "--author=" workbench-jira-git-author) "--format=%ct")))
                                     (cons d (string-to-number date))))
                                 git-dirs)))
@@ -50,8 +50,8 @@
   (let* ((dirs (workbench-cc--recent-repos))
          (all nil))
     (dolist (dir dirs)
-      (when-let ((lines (workbench-shell-lines
-                         dir "git" "log" "-5"
+      (when-let* ((lines (workbench-shell-lines
+                          dir "git" "log" "-5"
                          (concat "--author=" workbench-jira-git-author) "--since=3 days ago"
                          "--format=%ct|%ar|%s")))
         (dolist (line lines)

@@ -44,7 +44,7 @@ In team-lead (text) view, reads the ticket key from text properties.
 In IC (SVG) view, text properties are not available — prompts for the key
 from the cached ticket list instead."
   (interactive)
-  (if-let ((key (get-text-property (point) 'workbench-cc-ticket-key)))
+  (if-let* ((key (get-text-property (point) 'workbench-cc-ticket-key)))
       (progn
         (unless (workbench-cc--valid-ticket-key-p key)
           (user-error "Invalid ticket key format: %s" key))

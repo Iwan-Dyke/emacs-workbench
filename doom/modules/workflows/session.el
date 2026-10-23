@@ -156,7 +156,7 @@ to an idle timer so rapid j/k navigation doesn't do redundant work."
   "Return non-nil when the current buffer has an active Dirvish layout."
   (and (fboundp 'dirvish-curr)
        (fboundp 'dv-curr-layout)
-       (when-let ((dirvish (dirvish-curr)))
+       (when-let* ((dirvish (dirvish-curr)))
          (dv-curr-layout dirvish))))
 
 (defun workbench--files-workspace-full-frame (&rest _)

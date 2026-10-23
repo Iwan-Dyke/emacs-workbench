@@ -20,7 +20,7 @@ never subject to shell interpolation."
 (defun workbench-shell-lines (dir &rest args)
   "Run ARGS in DIR, return non-empty stdout lines as a list.
 Returns nil when the command fails or produces no output."
-  (when-let ((out (apply #'workbench-shell dir args)))
+  (when-let* ((out (apply #'workbench-shell dir args)))
     (split-string out "\n" t)))
 
 (defun workbench-shell-or-error (dir &rest args)

@@ -142,8 +142,8 @@ Returns a list of plists or nil for empty output."
 
 (defun workbench-jira--ticket-details (key)
   "Get extra details for KEY: last comment snippet and parent."
-  (when-let ((output (workbench-shell
-                      nil "jira" "issue" "view" key "--comments" "1" "--plain")))
+  (when-let* ((output (workbench-shell
+                       nil "jira" "issue" "view" key "--comments" "1" "--plain")))
     (let ((parent nil) (comment nil))
       (when (string-match "Parent:\\s-*\\([A-Z]+-[0-9]+\\)" output)
         (setq parent (match-string 1 output)))
@@ -153,21 +153,21 @@ Returns a list of plists or nil for empty output."
 
 (defun workbench-jira--ticket-last-comment-date (key)
   "Get date of last comment on KEY, or nil."
-  (when-let ((output (workbench-shell
-                      nil "jira" "issue" "view" key "--plain")))
+  (when-let* ((output (workbench-shell
+                       nil "jira" "issue" "view" key "--plain")))
     (when (string-match "• \\([A-Z][a-z]+, [0-9]+ [A-Z][a-z]+ [0-9]+\\) •" output)
       (match-string 1 output))))
 
 (defun workbench-jira--ticket-commented-today-p (key)
   "Return t if KEY has a comment from today."
-  (when-let ((date-str (workbench-jira--ticket-last-comment-date key)))
+  (when-let* ((date-str (workbench-jira--ticket-last-comment-date key)))
     (let ((today (format-time-string "%d %B %Y")))
       (string-match-p (regexp-quote today) date-str))))
 
 (defun workbench-jira--team-ticket-last-comment (key)
   "Get last comment snippet and author for KEY."
-  (when-let ((output (workbench-shell
-                      nil "jira" "issue" "view" key "--comments" "1" "--plain")))
+  (when-let* ((output (workbench-shell
+                       nil "jira" "issue" "view" key "--comments" "1" "--plain")))
     (let ((author nil) (snippet nil))
       (when (string-match "\\([A-Za-z ]+\\) •.*• Latest comment" output)
         (setq author (string-trim (match-string 1 output))))
@@ -281,7 +281,7 @@ three fetch calls and returns the result as a plist."
                   (let ((result (list :tickets (workbench-jira--fetch-tickets)
                                       :done (workbench-jira--fetch-done)
                                       :next (workbench-jira--fetch-next))))
-                    (prin1 result)))))
+                    result))))
     (workbench-async-eval
      'jira form
      (lambda (result)

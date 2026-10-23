@@ -5,6 +5,13 @@
 ;; result via `read', and calls a callback with the parsed sexp (or nil
 ;; on failure). Handles process lifecycle, timeout, and buffer cleanup.
 ;;
+;; The child's stdout can contain arbitrary noise before the result:
+;; obsolete-macro warnings (e.g. `when-let' in Emacs 31.1), `message'
+;; output, or byte-compile chatter. To parse the result unambiguously,
+;; the child is wrapped so it prints a start sentinel, then the result,
+;; then an end sentinel. The parent reads the single sexp that follows
+;; the start sentinel and ignores everything before it.
+;;
 ;; Used by jira.el (async cache refresh) and command-centre.el (async
 ;; data collection).
 
@@ -12,6 +19,43 @@
 
 (defvar workbench-async--processes (make-hash-table :test 'eq)
   "Map of caller-key → (process . timeout-timer) for tracking in-flight evals.")
+
+(defconst workbench-async--result-begin "WORKBENCH-ASYNC-RESULT-BEGIN"
+  "Sentinel printed by the child immediately before the result sexp.")
+
+(defconst workbench-async--result-end "WORKBENCH-ASYNC-RESULT-END"
+  "Sentinel printed by the child immediately after the result sexp.")
+
+;;; ── Result parsing ─────────────────────────────────────────────────────────
+
+(defun workbench-async--wrap-form (form)
+  "Wrap FORM so the child prints its value between unique sentinels.
+FORM is evaluated for its VALUE (it must no longer print the result
+itself). The wrapper prints the start sentinel, then the value via
+`prin1', then the end sentinel. Because the sentinels bracket only the
+`prin1' of the final value, any stray stdout emitted while FORM runs
+\(obsolete-macro warnings, `message' output) lands before the start
+sentinel and is ignored by the parent."
+  `(progn
+     (let ((workbench-async--value (progn ,form)))
+       (princ ,(concat "\n" workbench-async--result-begin "\n"))
+       (prin1 workbench-async--value)
+       (princ ,(concat "\n" workbench-async--result-end "\n")))))
+
+(defun workbench-async--extract-result (text)
+  "Extract and read the result sexp from child stdout TEXT.
+Reads the single sexp between the start and end sentinels, ignoring any
+leading noise. Returns the parsed value, or nil if the sentinels are
+absent or the delimited region cannot be read as a sexp."
+  (when (stringp text)
+    (let ((start (string-search workbench-async--result-begin text)))
+      (when start
+        (let* ((from (+ start (length workbench-async--result-begin)))
+               (end (string-search workbench-async--result-end text from))
+               (body (substring text from (or end (length text)))))
+          (condition-case nil
+              (car (read-from-string body))
+            (error nil)))))))
 
 ;;; ── Public API ─────────────────────────────────────────────────────────────
 
@@ -22,8 +66,11 @@ KEY is a symbol identifying this async operation (e.g. \\='jira or \\='cc).
 If an operation with the same KEY is already in flight, it is killed first.
 
 FORM is an unquoted Emacs Lisp expression. It will be serialized via
-`prin1-to-string' and passed to `emacs --batch --eval'. The form MUST
-call `(prin1 result)' as its final expression to produce output.
+`prin1-to-string' and passed to `emacs --batch --eval'. FORM is
+evaluated for its VALUE: its final expression must produce the result
+to return (do NOT call `prin1' yourself — the wrapper prints the value
+between unique sentinels so the parent can parse it despite stray
+stdout noise such as warnings or `message' output).
 
 CALLBACK receives one argument: the parsed sexp from the child's stdout,
 or nil if the process failed, timed out, or produced unparseable output.
@@ -52,7 +99,8 @@ NAME is a human-readable label for log messages (default: KEY symbol name)."
                       :name (format "%s-async" label)
                       :buffer output-buf
                       :command (list emacs-bin "--batch" "--eval"
-                                    (prin1-to-string form))
+                                    (prin1-to-string
+                                     (workbench-async--wrap-form form)))
                       :noquery t
                       :sentinel
                   (lambda (process _event)
@@ -72,12 +120,12 @@ NAME is a human-readable label for log messages (default: KEY symbol name)."
                                 (when (zerop (process-exit-status process))
                                   (when (buffer-live-p (process-buffer process))
                                     (with-current-buffer (process-buffer process)
-                                      (goto-char (point-min))
-                                      (condition-case nil
-                                          (setq result (read (current-buffer)))
-                                        (error
-                                         (message "%s: failed to parse output"
-                                                  label))))))
+                                      (setq result
+                                            (workbench-async--extract-result
+                                             (buffer-string)))
+                                      (unless result
+                                        (message "%s: failed to parse output"
+                                                 label)))))
                                 (when (not (zerop (process-exit-status process)))
                                   (message "%s: process exited %d"
                                            label (process-exit-status process)))

@@ -18,6 +18,7 @@ check:
 test:
     emacs --batch --no-init-file -L test -l ert -l test-helper \
       -l test/unit/test-core.el \
+      -l test/unit/test-async-eval.el \
       -l test/unit/test-jira.el \
       -l test/unit/test-terminals.el \
       -l test/unit/test-git.el \

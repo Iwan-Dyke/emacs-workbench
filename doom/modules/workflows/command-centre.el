@@ -55,7 +55,7 @@ plist on success, or nil on failure."
                   (let ((result ,(pcase view
                                    ('team-lead '(workbench-cc--collect-team-lead))
                                    (_ '(workbench-cc--collect-all)))))
-                    (prin1 result)))))
+                    result))))
     (workbench-async-eval 'cc form callback 60 "Command centre")))
 
 (defvar workbench-cc--fetch-failure-count 0
@@ -221,7 +221,7 @@ happens to be current."
   (when (fboundp '+workspace/switch-to)
     (+workspace/switch-to 0))
   ;; Kill the Doom dashboard buffer if it's squatting in the window
-  (when-let ((doom-buf (get-buffer "*doom*")))
+  (when-let* ((doom-buf (get-buffer "*doom*")))
     (when (eq doom-buf (window-buffer))
       (kill-buffer doom-buf)))
   ;; Show a placeholder buffer immediately so the user sees something

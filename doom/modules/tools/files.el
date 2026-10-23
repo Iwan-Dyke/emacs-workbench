@@ -9,7 +9,7 @@
 
 (defun workbench--project-root ()
   "Return the current project root, or `default-directory' when outside a project."
-  (or (when-let ((project (project-current nil)))
+  (or (when-let* ((project (project-current nil)))
         (project-root project))
       default-directory))
 
@@ -100,7 +100,7 @@ workspaces."
               (select-window (workbench--treemacs-window))
             ;; Wrong project — kill and reinitialise
             (delete-window (workbench--treemacs-window))
-            (when-let ((buf (treemacs-get-local-buffer)))
+            (when-let* ((buf (treemacs-get-local-buffer)))
               (kill-buffer buf))
             (treemacs--init path name)))
       ;; Not visible
@@ -124,7 +124,7 @@ workspaces."
     (let ((current-projects (treemacs-workspace->projects (treemacs-current-workspace))))
       (when (> (length current-projects) 1)
         (workbench--treemacs-strip-extra-projects path)))
-    (when-let ((window (workbench--treemacs-window)))
+    (when-let* ((window (workbench--treemacs-window)))
       (select-window window))))
 
 (defun workbench/open-project-tree ()

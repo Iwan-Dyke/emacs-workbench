@@ -322,7 +322,7 @@ Spawns a child Emacs to do the scanning so the UI is not blocked."
                   (load ,data-file nil t)
                   (let* ((paths (workbench-repos--scan-roots ',roots))
                          (statuses (workbench-repos--get-all-statuses paths)))
-                    (prin1 statuses)))))
+                    statuses))))
     (workbench-async-eval
      'repos form
      (lambda (result)
@@ -364,21 +364,21 @@ Spawns a child Emacs to do the scanning so the UI is not blocked."
 (defun workbench-repos--path-at-point ()
   "Return the repo path at point, or nil."
   (or (when (fboundp 'vtable-current-object)
-        (when-let ((obj (vtable-current-object)))
+        (when-let* ((obj (vtable-current-object)))
           (plist-get obj :path)))
       (get-text-property (line-beginning-position) 'workbench-repos-path)))
 
 (defun workbench-repos-open-project ()
   "Open the repo at point as a project workspace."
   (interactive)
-  (if-let ((path (workbench-repos--path-at-point)))
+  (if-let* ((path (workbench-repos--path-at-point)))
       (workbench/open-project-workspace path)
     (user-error "No repo at point")))
 
 (defun workbench-repos-magit ()
   "Open magit for the repo at point."
   (interactive)
-  (if-let ((path (workbench-repos--path-at-point)))
+  (if-let* ((path (workbench-repos--path-at-point)))
       (let ((default-directory path))
         (workbench/toggle-popup-magit))
     (user-error "No repo at point")))
@@ -448,13 +448,13 @@ blocking the UI. CALLBACK receives the list of status plists, or nil on failure.
                   (load ,shell-file nil t)
                   (load ,data-file nil t)
                   (let ((statuses (workbench-repos--get-all-statuses ',paths)))
-                    (prin1 statuses)))))
+                    statuses))))
     (workbench-async-eval 'repos-status form callback 30 "Repos status")))
 
 (defun workbench-repos-pull-selected ()
   "Pull the repo at point (only if clean and behind)."
   (interactive)
-  (if-let ((path (workbench-repos--path-at-point)))
+  (if-let* ((path (workbench-repos--path-at-point)))
       (let ((repo (seq-find (lambda (r) (equal (plist-get r :path) path))
                             workbench-repos--statuses)))
         (cond

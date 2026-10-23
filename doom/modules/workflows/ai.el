@@ -77,9 +77,9 @@ whether the project tree is open.")
 Returns a column count (integer) so `display-buffer' doesn't miscalculate
 when Treemacs is consuming part of the frame."
   (let* ((frame-cols (frame-width))
-         (tree-cols (if-let ((tw (workbench--treemacs-window)))
-                       (window-total-width tw)
-                     0))
+         (tree-cols (if-let* ((tw (workbench--treemacs-window)))
+                        (window-total-width tw)
+                      0))
          (available (- frame-cols tree-cols)))
     (max 40 (round (* available workbench-project-ai-width)))))
 
@@ -92,7 +92,7 @@ when Treemacs is consuming part of the frame."
 Only searches the selected frame to avoid affecting panes on other frames."
   (let ((ws (+workspace-current-name)))
     (seq-some (lambda (tool)
-                (when-let ((buffer (get-buffer (format "*project-%s:%s*" tool ws))))
+                (when-let* ((buffer (get-buffer (format "*project-%s:%s*" tool ws))))
                   (get-buffer-window buffer (selected-frame))))
               (mapcar #'car workbench/ai-commands))))
 
@@ -103,13 +103,13 @@ Launches at the project root so the agent sees the whole project."
   ;; Cancel resize timers on ANY existing project AI buffer for this workspace
   ;; to prevent accumulation when rapidly switching between tools.
   (dolist (tool-name (mapcar #'car workbench/ai-commands))
-    (when-let ((buf (get-buffer (workbench--project-ai-buffer-name tool-name))))
+    (when-let* ((buf (get-buffer (workbench--project-ai-buffer-name tool-name))))
       (when (buffer-live-p buf)
         (with-current-buffer buf
           (when (timerp workbench--ai-pane-resize-timer)
             (cancel-timer workbench--ai-pane-resize-timer)
             (setq workbench--ai-pane-resize-timer nil))))))
-  (when-let ((other (workbench--project-ai-window)))
+  (when-let* ((other (workbench--project-ai-window)))
     (delete-window other))
   (let* ((buffer-name (workbench--project-ai-buffer-name tool))
          (command (workbench--ai-command tool))
@@ -233,7 +233,7 @@ Replaces the previous 5-path timing approach with a single mechanism."
             (h (window-body-height window))
             (w (window-body-width window)))
         (vterm--set-size vterm--term h w)
-        (when-let ((proc (get-buffer-process buffer)))
+        (when-let* ((proc (get-buffer-process buffer)))
           (set-process-window-size proc h w))))))
 
 (defvar workbench--vterm-resize-timer nil

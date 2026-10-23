@@ -42,7 +42,7 @@
          (goto-char (point-min))
          (let (found)
            (while (and (not found) (not (eobp)))
-             (when-let ((raw (thing-at-point 'line t)))
+             (when-let* ((raw (thing-at-point 'line t)))
                (let ((line (string-trim raw)))
                  (when (and (not (string-empty-p line))
                             (not (string-prefix-p "#" line))
@@ -57,7 +57,7 @@
 (defun workbench--dashboard-size (directory)
   "Get file count and line count for DIRECTORY via git ls-files."
   (when (workbench--dashboard-git-p directory)
-    (when-let ((files (workbench-shell-lines directory "git" "ls-files")))
+    (when-let* ((files (workbench-shell-lines directory "git" "ls-files")))
       (list :files (length files)
             :lines (string-to-number
                     (or (workbench-shell directory
@@ -123,10 +123,10 @@
 (defun workbench--dashboard-languages (directory)
   "Collect language breakdown from git ls-files in DIRECTORY.
 Returns alist of (language . count) sorted by count descending, top 5."
-  (when-let ((files (workbench-shell-lines directory "git" "ls-files")))
+  (when-let* ((files (workbench-shell-lines directory "git" "ls-files")))
     (let ((counts (make-hash-table :test 'equal)))
       (dolist (file files)
-        (when-let ((ext (file-name-extension file)))
+        (when-let* ((ext (file-name-extension file)))
           (puthash ext (1+ (gethash ext counts 0)) counts)))
       (let (pairs)
         (maphash (lambda (k v) (push (cons k v) pairs)) counts)

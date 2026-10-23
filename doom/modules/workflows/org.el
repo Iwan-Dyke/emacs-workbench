@@ -83,7 +83,7 @@ When TICKETS is an error plist, refuses to write to avoid wiping valid content."
         (with-temp-file file
           (insert content))
         ;; Revert any buffer visiting this file so it stays in sync
-        (when-let ((buf (find-buffer-visiting file)))
+        (when-let* ((buf (find-buffer-visiting file)))
           (with-current-buffer buf
             (revert-buffer t t t)))))))
 
